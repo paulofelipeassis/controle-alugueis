@@ -1,25 +1,40 @@
 import streamlit as st
+import streamlit_authenticator as stauth
 import gspread
 import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import streamlit_authenticator as stauth
 import re
+import plotly.express as px
+from copy import deepcopy # <-- ADICIONADO AQUI
 
-# --- CABEÇALHO CORRIGIDO PARA A NUVEM ---
+# --- CABEÇALHO UNIVERSAL PARA A NUVEM ---
 try:
-    credentials = dict(st.secrets['credentials'])
+    # Copia PROFUNDA dos segredos para um dict normal
+    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
     cookie = dict(st.secrets['cookie'])
-    authenticator = stauth.Authenticate(credentials, cookie['name'], cookie['key'], cookie['expiry_days'])
+
+    authenticator = stauth.Authenticate(
+        credentials,
+        cookie['name'],
+        cookie['key'],
+        cookie['expiry_days']
+    )
 except KeyError:
     st.error("Erro na configuração de autenticação (Secrets). Por favor, faça login novamente.")
     st.stop()
+
+# Verifica se o usuário está logado
 if not st.session_state.get("authentication_status"):
     st.warning("Você precisa fazer login para acessar esta página.")
     st.stop()
+
+# Mostra o nome do usuário e o botão de logout na barra lateral
 st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
 authenticator.logout(location='sidebar')
 # --- FIM DO CABEÇALHO ---
+
+# O resto do seu código original da página vem DEPOIS disso...
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
