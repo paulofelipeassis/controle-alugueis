@@ -1,17 +1,15 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import gspread
 import pandas as pd
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
+import streamlit_authenticator as stauth
 import re
-import plotly.express as px
-from copy import deepcopy # <-- ADICIONADO AQUI
+from copy import deepcopy
 
-# --- CABEÇALHO UNIVERSAL PARA A NUVEM ---
+# --- CABEÇALHO CORRIGIDO PARA A NUVEM (VERSÃO FINAL) ---
 try:
     # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
+    credentials = deepcopy(st.secrets['credentials'])
     cookie = dict(st.secrets['cookie'])
 
     authenticator = stauth.Authenticate(
@@ -34,13 +32,14 @@ st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
 authenticator.logout(location='sidebar')
 # --- FIM DO CABEÇALHO ---
 
-# O resto do seu código original da página vem DEPOIS disso...
 
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Cadastrar Novo Contrato", page_icon="✍️", layout="wide")
 st.title("✍️ Cadastrar Novo Contrato de Locação")
 st.markdown("---")
 
 
+# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
 @st.cache_resource
 def get_connection():
     gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
@@ -53,10 +52,9 @@ contratos_ws = sh.worksheet("Contratos")
 gestores_ws = sh.worksheet("Gestores")
 
 
-# --- FUNÇÃO DE CACHE CORRIGIDA ---
+# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS ---
 @st.cache_data(ttl=600)
 def load_data_from_name(worksheet_name):
-    # Passamos o NOME da aba, não o objeto
     worksheet = sh.worksheet(worksheet_name)
     data = worksheet.get_all_values()
     if len(data) < 2: return pd.DataFrame()
@@ -67,6 +65,7 @@ def load_data_from_name(worksheet_name):
 df_imoveis = load_data_from_name("Imoveis")
 df_gestores = load_data_from_name("Gestores")
 
+# --- PASSO 1: SELEÇÃO DO IMÓVEL COM MENUS DEPENDENTES ---
 st.subheader("Passo 1: Selecione um Imóvel Vago")
 if not df_imoveis.empty:
     imoveis_vagos = df_imoveis[df_imoveis['Status'] == 'Vago']
@@ -117,8 +116,12 @@ if not df_imoveis.empty:
                                                valor_aluguel, dia_vencimento, tipo_garantia, valor_garantia,
                                                indice_reajuste, "Ativo", obs_contrato]
                         contratos_ws.append_row(nova_linha_contrato)
-                        cell = imoveis_ws.find(id_imovel_selecionado)
+
+                        # Encontra a célula na coluna A (col=1)
+                        cell = imoveis_ws.find(id_imovel_selecionado, in_column=1)
+                        # Atualiza a célula na mesma linha, mas na coluna 5 (E)
                         imoveis_ws.update_cell(cell.row, 5, "Alugado")
+
                         st.cache_data.clear()
                         st.success(f"Contrato '{id_contrato}' criado com sucesso!")
                         st.info("O status do imóvel foi atualizado para 'Alugado'.")

@@ -1,17 +1,15 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import gspread
 import pandas as pd
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
+import streamlit_authenticator as stauth
 import re
-import plotly.express as px
-from copy import deepcopy # <-- ADICIONADO AQUI
+from datetime import datetime
+from copy import deepcopy
 
-# --- CABEÇALHO UNIVERSAL PARA A NUVEM ---
+# --- CABEÇALHO CORRIGIDO PARA A NUVEM (VERSÃO FINAL) ---
 try:
     # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
+    credentials = deepcopy(st.secrets['credentials'])
     cookie = dict(st.secrets['cookie'])
 
     authenticator = stauth.Authenticate(
@@ -33,8 +31,6 @@ if not st.session_state.get("authentication_status"):
 st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
 authenticator.logout(location='sidebar')
 # --- FIM DO CABEÇALHO ---
-
-# O resto do seu código original da página vem DEPOIS disso...
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -69,7 +65,6 @@ df_imoveis = load_imoveis()
 # --- PASSO 1: SELECIONAR O IMÓVEL PARA EDITAR ---
 st.subheader("Passo 1: Selecione o Imóvel que Deseja Editar")
 
-# Filtro por grupo para facilitar a busca
 if not df_imoveis.empty:
     grupos = ["Todos"] + sorted(list(df_imoveis['Grupo'].unique()))
     grupo_selecionado = st.selectbox("Filtrar por Grupo", grupos)

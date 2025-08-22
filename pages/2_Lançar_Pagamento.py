@@ -1,40 +1,25 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import gspread
 import pandas as pd
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
+import streamlit_authenticator as stauth
 import re
-import plotly.express as px
-from copy import deepcopy # <-- ADICIONADO AQUI
+from copy import deepcopy
 
-# --- CABEÇALHO UNIVERSAL PARA A NUVEM ---
+# --- CABEÇALHO CORRIGIDO PARA A NUVEM (VERSÃO FINAL) ---
 try:
-    # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
+    credentials = deepcopy(st.secrets['credentials'])
     cookie = dict(st.secrets['cookie'])
-
-    authenticator = stauth.Authenticate(
-        credentials,
-        cookie['name'],
-        cookie['key'],
-        cookie['expiry_days']
-    )
+    authenticator = stauth.Authenticate(credentials, cookie['name'], cookie['key'], cookie['expiry_days'])
 except KeyError:
     st.error("Erro na configuração de autenticação (Secrets). Por favor, faça login novamente.")
     st.stop()
-
-# Verifica se o usuário está logado
 if not st.session_state.get("authentication_status"):
     st.warning("Você precisa fazer login para acessar esta página.")
     st.stop()
-
-# Mostra o nome do usuário e o botão de logout na barra lateral
 st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
 authenticator.logout(location='sidebar')
 # --- FIM DO CABEÇALHO ---
-
-# O resto do seu código original da página vem DEPOIS disso...
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -80,7 +65,6 @@ if not df_contratos.empty:
     if contrato_selecionado_str != "Selecione um contrato...":
         nome_locatario_selecionado = contrato_selecionado_str.split(" (Imóvel ")[0]
 
-        # Converte a coluna para numérico antes de usar .iloc
         contratos_ativos['Valor_Aluguel_Base'] = pd.to_numeric(contratos_ativos['Valor_Aluguel_Base'],
                                                                errors='coerce').fillna(0)
         dados_contrato = contratos_ativos[contratos_ativos['Nome_Locatario'] == nome_locatario_selecionado].iloc[0]
@@ -109,9 +93,8 @@ if not df_contratos.empty:
 
             if submitted:
                 with st.spinner("Lançando..."):
-                    # Pega todos os valores para determinar o próximo ID de forma segura
                     all_values = financeiro_ws.get_all_values()
-                    proximo_id = len(all_values)  # O ID será o número da próxima linha (já que o cabeçalho é a linha 1)
+                    proximo_id = len(all_values)
 
                     data_pagamento_str = data_pagamento.strftime("%Y-%m-%d")
 
@@ -119,7 +102,7 @@ if not df_contratos.empty:
                                   multa_juros, valor_total_pago, forma_pagamento, "Pago", "Válido"]
 
                     financeiro_ws.append_row(nova_linha)
-                    st.cache_data.clear()  # Limpa o cache para atualizar o dashboard
+                    st.cache_data.clear()
                     st.success("Pagamento lançado com sucesso na planilha!")
                     st.balloons()
 else:

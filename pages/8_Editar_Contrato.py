@@ -1,17 +1,15 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import gspread
 import pandas as pd
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
+import streamlit_authenticator as stauth
 import re
-import plotly.express as px
-from copy import deepcopy # <-- ADICIONADO AQUI
+from copy import deepcopy
 
-# --- CABEÇALHO UNIVERSAL PARA A NUVEM ---
+# --- CABEÇALHO CORRIGIDO PARA A NUVEM (VERSÃO FINAL) ---
 try:
     # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
+    credentials = deepcopy(st.secrets['credentials'])
     cookie = dict(st.secrets['cookie'])
 
     authenticator = stauth.Authenticate(
@@ -33,8 +31,6 @@ if not st.session_state.get("authentication_status"):
 st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
 authenticator.logout(location='sidebar')
 # --- FIM DO CABEÇALHO ---
-
-# O resto do seu código original da página vem DEPOIS disso...
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -111,6 +107,8 @@ if not df_contratos_filtrado.empty:
                 with st.spinner("Salvando..."):
                     cell = contratos_ws.find(id_contrato_selecionado)
                     novos_valores = [dados_contrato['ID_Contrato'], dados_contrato['ID_Imovel'], gestor, nome, cpf, tel, email, str(data_inicio.date()), str(data_fim.date()), valor_aluguel, dia_vencimento, dados_contrato['Tipo_Garantia'], dados_contrato['Valor_da_Garantia'], dados_contrato['Indice_Reajuste'], status, obs]
+                    # O range P cobre 16 colunas, o que pode ser um erro se a sua planilha tiver menos. Verifique a quantidade de colunas.
+                    # Vamos assumir 16 colunas (A até P) por enquanto.
                     contratos_ws.update(f'A{cell.row}:P{cell.row}', [novos_valores])
                     st.cache_data.clear()
                     st.success("Contrato atualizado com sucesso!")
