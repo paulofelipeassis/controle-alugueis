@@ -6,32 +6,9 @@ from dateutil.relativedelta import relativedelta
 import streamlit_authenticator as stauth
 import re
 from copy import deepcopy
+from auth_utils import page_guard
 
-# --- CABEÇALHO CORRIGIDO PARA A NUVEM (VERSÃO FINAL) ---
-try:
-    # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials'])
-    cookie = dict(st.secrets['cookie'])
-
-    authenticator = stauth.Authenticate(
-        credentials,
-        cookie['name'],
-        cookie['key'],
-        cookie['expiry_days']
-    )
-except KeyError:
-    st.error("Erro na configuração de autenticação (Secrets). Por favor, faça login novamente.")
-    st.stop()
-
-# Verifica se o usuário está logado
-if not st.session_state.get("authentication_status"):
-    st.warning("Você precisa fazer login para acessar esta página.")
-    st.stop()
-
-# Mostra o nome do usuário e o botão de logout na barra lateral
-st.sidebar.title(f"Bem-vindo, *{st.session_state['name']}* 👋")
-authenticator.logout(location='sidebar')
-# --- FIM DO CABEÇALHO ---
+page_guard()
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
