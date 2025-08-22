@@ -1,14 +1,16 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-from copy import deepcopy # <-- ADICIONADO AQUI
+from copy import deepcopy
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Login - Controle de Aluguéis", page_icon="🔑", layout="centered")
 
+st.success("VERSÃO CORRIGIDA COM DEEPCOPY - v2") # <--- MARCA DE VERSÃO PARA TESTE
+
 # --- LÓGICA DE LOGIN ---
 try:
     # Copia PROFUNDA dos segredos para um dict normal
-    credentials = deepcopy(st.secrets['credentials']) # <-- ALTERADO AQUI
+    credentials = deepcopy(st.secrets['credentials'])
     cookie = dict(st.secrets['cookie'])
 
     authenticator = stauth.Authenticate(
