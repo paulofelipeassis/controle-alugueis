@@ -1,11 +1,7 @@
 import streamlit as st
-import gspread
-import pandas as pd
 from datetime import datetime
-import streamlit_authenticator as stauth
-import re
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data, append_row, proximo_id_lancamento
 
 page_guard()
 
@@ -16,29 +12,8 @@ st.title("💰 Lançar Novo Pagamento")
 st.markdown("---")
 
 
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-
-sh = get_connection()
-contratos_ws = sh.worksheet("Contratos")
-financeiro_ws = sh.worksheet("Lancamentos_Financeiros")
-
-
 # --- CARREGAMENTO DOS DADOS ---
-@st.cache_data(ttl=600)
-def load_contratos():
-    data = contratos_ws.get_all_values()
-    if len(data) < 2: return pd.DataFrame()
-    headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
-    return df
-
-
-df_contratos = load_contratos()
+df_contratos = load_data("Contratos")
 
 # --- FORMULÁRIO DE LANÇAMENTO ---
 if not df_contratos.empty:
@@ -53,8 +28,6 @@ if not df_contratos.empty:
     if contrato_selecionado_str != "Selecione um contrato...":
         nome_locatario_selecionado = contrato_selecionado_str.split(" (Imóvel ")[0]
 
-        contratos_ativos['Valor_Aluguel_Base'] = pd.to_numeric(contratos_ativos['Valor_Aluguel_Base'],
-                                                               errors='coerce').fillna(0)
         dados_contrato = contratos_ativos[contratos_ativos['Nome_Locatario'] == nome_locatario_selecionado].iloc[0]
 
         id_contrato = dados_contrato['ID_Contrato']
@@ -81,17 +54,15 @@ if not df_contratos.empty:
 
             if submitted:
                 with st.spinner("Lançando..."):
-                    all_values = financeiro_ws.get_all_values()
-                    proximo_id = len(all_values)
-
-                    data_pagamento_str = data_pagamento.strftime("%Y-%m-%d")
-
-                    nova_linha = [proximo_id, id_contrato, mes_referencia, data_pagamento_str, valor_aluguel_pago,
-                                  multa_juros, valor_total_pago, forma_pagamento, "Pago", "Válido"]
-
-                    financeiro_ws.append_row(nova_linha)
-                    st.cache_data.clear()
-                    st.success("Pagamento lançado com sucesso na planilha!")
-                    st.balloons()
+                    try:
+                        proximo_id = proximo_id_lancamento()
+                        data_pagamento_str = data_pagamento.strftime("%Y-%m-%d")
+                        nova_linha = [proximo_id, id_contrato, mes_referencia, data_pagamento_str, valor_aluguel_pago,
+                                      multa_juros, valor_total_pago, forma_pagamento, "Pago", "Válido"]
+                        append_row("Lancamentos_Financeiros", nova_linha)
+                        st.success("Pagamento lançado com sucesso na planilha!")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Ocorreu um erro ao lançar o pagamento: {e}")
 else:
     st.warning("Não foi possível carregar os dados de contratos para iniciar o lançamento.")

@@ -1,11 +1,7 @@
 import streamlit as st
-import gspread
 import pandas as pd
-from datetime import datetime
-import streamlit_authenticator as stauth
-import re
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data_fresh, atualizar_contrato
 
 page_guard()
 
@@ -14,28 +10,7 @@ st.set_page_config(page_title="Editar Contrato", page_icon="✏️", layout="wid
 st.title("✏️ Editar Contrato de Locação")
 st.markdown("---")
 
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-sh = get_connection()
-contratos_ws = sh.worksheet("Contratos")
-
-# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS ---
-@st.cache_data(ttl=30)
-def load_contratos():
-    data = contratos_ws.get_all_values()
-    if len(data) < 2: return pd.DataFrame()
-    headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
-    for col in ['Valor_Aluguel_Base', 'Dia_Vencimento', 'Valor_da_Garantia']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    return df
-
-df_contratos_todos = load_contratos()
+df_contratos_todos = load_data_fresh("Contratos")
 
 # --- PASSO 1: SELECIONAR O CONTRATO PARA EDITAR ---
 st.subheader("Passo 1: Selecione o Contrato que Deseja Editar")
@@ -81,13 +56,17 @@ if not df_contratos_filtrado.empty:
             submitted = st.form_submit_button("Salvar Alterações")
             if submitted:
                 with st.spinner("Salvando..."):
-                    cell = contratos_ws.find(id_contrato_selecionado)
                     novos_valores = [dados_contrato['ID_Contrato'], dados_contrato['ID_Imovel'], gestor, nome, cpf, tel, email, str(data_inicio.date()), str(data_fim.date()), valor_aluguel, dia_vencimento, dados_contrato['Tipo_Garantia'], dados_contrato['Valor_da_Garantia'], dados_contrato['Indice_Reajuste'], status, obs]
-                    # O range P cobre 16 colunas, o que pode ser um erro se a sua planilha tiver menos. Verifique a quantidade de colunas.
-                    # Vamos assumir 16 colunas (A até P) por enquanto.
-                    contratos_ws.update(f'A{cell.row}:P{cell.row}', [novos_valores])
-                    st.cache_data.clear()
-                    st.success("Contrato atualizado com sucesso!")
-                    st.balloons()
+                    try:
+                        atualizar_contrato(
+                            id_contrato_selecionado, novos_valores,
+                            id_imovel=dados_contrato['ID_Imovel'], novo_status_contrato=status,
+                        )
+                        st.success("Contrato atualizado com sucesso!")
+                        if status != "Ativo":
+                            st.info("Se não havia outro contrato ativo para o mesmo imóvel, o status dele foi atualizado para 'Vago'.")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Ocorreu um erro ao salvar o contrato: {e}")
 else:
     st.info("Nenhum contrato ativo para editar. Marque a caixa acima para ver todos os contratos.")

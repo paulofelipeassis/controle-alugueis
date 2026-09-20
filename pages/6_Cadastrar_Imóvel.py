@@ -1,11 +1,7 @@
 import streamlit as st
-import gspread
-import pandas as pd
 import re
-import streamlit_authenticator as stauth
-from datetime import datetime
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data_uncached, append_row
 
 page_guard()
 
@@ -13,17 +9,6 @@ page_guard()
 st.set_page_config(page_title="Cadastrar Novo Imóvel", page_icon="🏢")
 st.title("🏢 Cadastrar Novo Imóvel")
 st.markdown("---")
-
-
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-
-sh = get_connection()
-imoveis_ws = sh.worksheet("Imoveis")
 
 
 # --- FUNÇÃO PARA GERAR ID DO IMÓVEL ---
@@ -36,12 +21,11 @@ def gerar_id_imovel(grupo, unidade):
 # --- PASSO 1: SELEÇÃO DO GRUPO (FORA DO FORMULÁRIO) ---
 st.subheader("Passo 1: Defina o Grupo do Imóvel")
 
-imoveis_data = imoveis_ws.get_all_values()
-if len(imoveis_data) > 1:
-    df_imoveis = pd.DataFrame(imoveis_data[1:], columns=imoveis_data[0])
+# Sem cache: precisa sempre da lista de grupos mais atual, sem esperar o TTL.
+df_imoveis = load_data_uncached("Imoveis")
+if not df_imoveis.empty:
     grupos_existentes = sorted(list(df_imoveis['Grupo'].unique()))
 else:
-    df_imoveis = pd.DataFrame()
     grupos_existentes = []
 
 opcoes_grupo = grupos_existentes + ["--- Adicionar Novo Grupo ---"]
@@ -82,20 +66,20 @@ if grupo_final:
                 with st.spinner("Cadastrando e verificando..."):
                     id_imovel = gerar_id_imovel(grupo_final, unidade_final)
 
-                    # Recarrega os dados para a verificação de duplicidade
-                    imoveis_data_check = imoveis_ws.get_all_values()
-                    df_imoveis_atualizado = pd.DataFrame(imoveis_data_check[1:], columns=imoveis_data_check[0]) if len(
-                        imoveis_data_check) > 1 else pd.DataFrame()
+                    # Recarrega os dados (sem cache) para a verificação de duplicidade
+                    df_imoveis_atualizado = load_data_uncached("Imoveis")
 
                     if not df_imoveis_atualizado.empty and id_imovel in df_imoveis_atualizado['ID_Imovel'].values:
                         st.error(f"Erro: Um imóvel com o ID '{id_imovel}' já existe.")
                     else:
                         nova_linha = [id_imovel, grupo_final, unidade_final, endereco, "Vago", iptu_anual, medidor_agua,
                                       medidor_energia]
-                        imoveis_ws.append_row(nova_linha)
-                        st.success(
-                            f"Imóvel '{unidade_final}' cadastrado com sucesso no grupo '{grupo_final}'! ID gerado: **{id_imovel}**")
-                        st.cache_data.clear()
-                        st.balloons()
+                        try:
+                            append_row("Imoveis", nova_linha)
+                            st.success(
+                                f"Imóvel '{unidade_final}' cadastrado com sucesso no grupo '{grupo_final}'! ID gerado: **{id_imovel}**")
+                            st.balloons()
+                        except Exception as e:
+                            st.error(f"Ocorreu um erro ao cadastrar o imóvel: {e}")
 else:
     st.info("Selecione um grupo ou adicione um novo para continuar.")

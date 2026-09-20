@@ -1,11 +1,7 @@
 import streamlit as st
-import gspread
-import pandas as pd
 from datetime import datetime
-import streamlit_authenticator as stauth
-import re
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data, criar_contrato
 
 page_guard()
 
@@ -16,31 +12,8 @@ st.title("✍️ Cadastrar Novo Contrato de Locação")
 st.markdown("---")
 
 
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-
-sh = get_connection()
-imoveis_ws = sh.worksheet("Imoveis")
-contratos_ws = sh.worksheet("Contratos")
-gestores_ws = sh.worksheet("Gestores")
-
-
-# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS ---
-@st.cache_data(ttl=600)
-def load_data_from_name(worksheet_name):
-    worksheet = sh.worksheet(worksheet_name)
-    data = worksheet.get_all_values()
-    if len(data) < 2: return pd.DataFrame()
-    headers = data[0]
-    return pd.DataFrame(data[1:], columns=headers)
-
-
-df_imoveis = load_data_from_name("Imoveis")
-df_gestores = load_data_from_name("Gestores")
+df_imoveis = load_data("Imoveis")
+df_gestores = load_data("Gestores")
 
 # --- PASSO 1: SELEÇÃO DO IMÓVEL COM MENUS DEPENDENTES ---
 st.subheader("Passo 1: Selecione um Imóvel Vago")
@@ -92,17 +65,13 @@ if not df_imoveis.empty:
                                                data_inicio.strftime('%Y-%m-%d'), data_fim.strftime('%Y-%m-%d'),
                                                valor_aluguel, dia_vencimento, tipo_garantia, valor_garantia,
                                                indice_reajuste, "Ativo", obs_contrato]
-                        contratos_ws.append_row(nova_linha_contrato)
-
-                        # Encontra a célula na coluna A (col=1)
-                        cell = imoveis_ws.find(id_imovel_selecionado, in_column=1)
-                        # Atualiza a célula na mesma linha, mas na coluna 5 (E)
-                        imoveis_ws.update_cell(cell.row, 5, "Alugado")
-
-                        st.cache_data.clear()
-                        st.success(f"Contrato '{id_contrato}' criado com sucesso!")
-                        st.info("O status do imóvel foi atualizado para 'Alugado'.")
-                        st.balloons()
+                        try:
+                            criar_contrato(nova_linha_contrato, id_imovel_selecionado)
+                            st.success(f"Contrato '{id_contrato}' criado com sucesso!")
+                            st.info("O status do imóvel foi atualizado para 'Alugado'.")
+                            st.balloons()
+                        except Exception as e:
+                            st.error(f"Ocorreu um erro ao cadastrar o contrato: {e}")
     else:
         st.warning("Nenhum imóvel vago encontrado para criar um novo contrato.")
 else:

@@ -1,43 +1,15 @@
 import streamlit as st
-import gspread
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import streamlit_authenticator as stauth
 import plotly.express as px
-import re
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data
 
 page_guard()
 
 # --- O CÓDIGO DO SEU DASHBOARD COMEÇA AQUI ---
 st.set_page_config(page_title="Visão Geral", page_icon="🏠", layout="wide")
-
-
-# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS (CORRIGIDA PARA A NUVEM) ---
-@st.cache_data(ttl=600)
-def load_data(worksheet_name):
-    # --- CORREÇÃO ESSENCIAL AQUI ---
-    # Lê as credenciais do Google a partir dos "Secrets" em vez de um arquivo
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-
-    sh = gc.open("Controle de Aluguéis")
-    worksheet = sh.worksheet(worksheet_name)
-    data = worksheet.get_all_values()
-    if not data or len(data) < 2: return pd.DataFrame()
-    headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
-    for col_id in ['ID_Contrato', 'ID_Imovel']:
-        if col_id in df.columns: df[col_id] = df[col_id].astype(str)
-    for col in ['Valor_Aluguel_Base', 'Dia_Vencimento', 'Valor_Total_Pago']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    for col_date in ['Data_Inicio', 'Data_Fim', 'Data_Pagamento']:
-        if col_date in df.columns:
-            df[col_date] = pd.to_datetime(df[col_date], errors='coerce')
-    return df
-
 
 # --- CARREGAMENTO DOS DADOS ---
 df_imoveis = load_data("Imoveis")
