@@ -56,8 +56,8 @@ if not df_contratos_filtrado.empty:
             submitted = st.form_submit_button("Salvar Alterações")
             if submitted:
                 with st.spinner("Salvando..."):
-                    novos_valores = [dados_contrato['ID_Contrato'], dados_contrato['ID_Imovel'], gestor, nome, cpf, tel, email, str(data_inicio.date()), str(data_fim.date()), valor_aluguel, dia_vencimento, dados_contrato['Tipo_Garantia'], dados_contrato['Valor_da_Garantia'], dados_contrato['Indice_Reajuste'], status, obs]
                     try:
+                        novos_valores = [dados_contrato['ID_Contrato'], dados_contrato['ID_Imovel'], gestor, nome, cpf, tel, email, str(data_inicio), str(data_fim), valor_aluguel, dia_vencimento, dados_contrato['Tipo_Garantia'], dados_contrato['Valor_da_Garantia'], dados_contrato['Indice_Reajuste'], status, obs]
                         atualizar_contrato(
                             id_contrato_selecionado, novos_valores,
                             id_imovel=dados_contrato['ID_Imovel'], novo_status_contrato=status,
