@@ -65,11 +65,15 @@ def _fetch_worksheet_df(worksheet_name):
         logger.exception("Erro ao carregar a aba '%s'", worksheet_name)
         return pd.DataFrame()
 
-    if not data or len(data) < 2:
+    if not data:
         return pd.DataFrame()
 
     headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
+    # Aba só com cabeçalho (nenhum lançamento ainda, por exemplo): mantém as
+    # colunas certas com 0 linhas, em vez de devolver um DataFrame sem nenhuma
+    # coluna — senão qualquer acesso por nome de coluna (`df['Status_Lancamento']`)
+    # explode com KeyError mesmo a aba existindo e tendo cabeçalho válido.
+    df = pd.DataFrame(data[1:], columns=headers) if len(data) > 1 else pd.DataFrame(columns=headers)
     return _coerce_types(df)
 
 
