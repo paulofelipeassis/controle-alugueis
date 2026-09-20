@@ -11,6 +11,7 @@ e a sincronização entre Imoveis.Status e Contratos.Status_Contrato.
 import logging
 
 import gspread
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -44,13 +45,28 @@ def get_connection():
 
 
 # --- LEITURA ---
+def _parse_locale_number(value):
+    """get_all_values() devolve o valor *formatado* da célula, não o número
+    bruto — numa planilha com locale pt-BR, uma célula numérica com casas
+    decimais volta como string com vírgula ('1234,56'), que pd.to_numeric não
+    entende (vira NaN -> 0 depois do fillna, apagando o valor em silêncio).
+    Normaliza pro formato com ponto antes de converter.
+    """
+    if isinstance(value, str):
+        s = value.strip()
+        if "," in s:
+            s = s.replace(".", "").replace(",", ".")
+        return s
+    return value
+
+
 def _coerce_types(df):
     for col in ID_COLUMNS:
         if col in df.columns:
             df[col] = df[col].astype(str)
     for col in NUMERIC_COLUMNS:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df[col] = pd.to_numeric(df[col].apply(_parse_locale_number), errors="coerce").fillna(0)
     for col in DATE_COLUMNS:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
@@ -103,9 +119,22 @@ def _col_letter(n):
     return letters
 
 
+def _to_native(value):
+    """Converte escalares do NumPy (int64/float64/bool_) para tipos nativos do
+    Python. Valores de colunas coeridas por _coerce_types (ex: dados_contrato['Valor_da_Garantia'])
+    chegam como numpy.int64/float64 — o gspread real serializa a requisição em
+    JSON pra falar com a API do Google, e json.dumps não sabe lidar com esses
+    tipos (`TypeError: Object of type int64 is not JSON serializable`). Isso só
+    aparece contra a API de verdade, não contra um mock ingênuo.
+    """
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
 def append_row(worksheet_name, row_values):
     try:
-        get_connection().worksheet(worksheet_name).append_row(row_values)
+        get_connection().worksheet(worksheet_name).append_row([_to_native(v) for v in row_values])
         st.cache_data.clear()
     except Exception:
         logger.exception("Erro ao adicionar linha na aba '%s'", worksheet_name)
@@ -120,7 +149,7 @@ def update_row(worksheet_name, id_value, row_values):
         if cell is None:
             raise ValueError(f"ID '{id_value}' não encontrado na aba '{worksheet_name}'.")
         last_col = _col_letter(len(row_values))
-        worksheet.update(f"A{cell.row}:{last_col}{cell.row}", [row_values])
+        worksheet.update(f"A{cell.row}:{last_col}{cell.row}", [[_to_native(v) for v in row_values]])
         st.cache_data.clear()
     except Exception:
         logger.exception("Erro ao atualizar linha (ID=%s) na aba '%s'", id_value, worksheet_name)
@@ -134,7 +163,7 @@ def update_cell(worksheet_name, id_value, column_index, new_value):
         cell = worksheet.find(str(id_value))
         if cell is None:
             raise ValueError(f"ID '{id_value}' não encontrado na aba '{worksheet_name}'.")
-        worksheet.update_cell(cell.row, column_index, new_value)
+        worksheet.update_cell(cell.row, column_index, _to_native(new_value))
         st.cache_data.clear()
     except Exception:
         logger.exception("Erro ao atualizar célula (ID=%s, coluna=%s) na aba '%s'", id_value, column_index, worksheet_name)
