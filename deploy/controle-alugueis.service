@@ -1,0 +1,15 @@
+[Unit]
+Description=Controle de Alugueis (Streamlit)
+After=network.target
+
+[Service]
+Type=simple
+User=controle-alugueis
+Group=controle-alugueis
+WorkingDirectory=/opt/controle-alugueis
+ExecStart=/opt/controle-alugueis/.venv/bin/streamlit run app.py --server.port 8501 --server.address 127.0.0.1 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
