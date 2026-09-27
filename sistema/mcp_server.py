@@ -22,6 +22,7 @@ Sistema de controle de aluguéis da família. Princípio: o sistema diz o que é
 o banco diz o que foi pago, e você (Hermes) executa e registra — não decide.
 Valores em reais como texto no formato brasileiro ("1.234,56"). Datas no formato
 AAAA-MM-DD. Competência = mês de vencimento da cobrança, no formato AAAA-MM.
+Listas vêm como {"quantidade": N, "itens": [...]}; quantidade 0 = nada encontrado.
 Na dúvida, use criar_pendencia para uma pessoa olhar, em vez de adivinhar.
 Leia o guia docs/hermes.md do projeto para as rotinas sugeridas."""
 
@@ -32,6 +33,12 @@ mcp = FastMCP(
     stateless_http=True,
     json_response=True,
 )
+
+
+def _lista(itens):
+    """Listas sempre como {"quantidade", "itens"}: lista vazia vira quantidade 0, e não uma
+    resposta vazia (que o Hermes poderia confundir com erro)."""
+    return {"quantidade": len(itens), "itens": itens}
 
 
 def _centavos(valor, campo="valor"):
@@ -47,18 +54,18 @@ def painel() -> dict:
 
 
 @mcp.tool()
-def alertas() -> list:
+def alertas() -> dict:
     """Avisos que pedem ação: contratos terminando em 60 dias, contratos com prazo vencido
     (renovar ou encerrar), reajustes devidos, cobranças sem boleto vencendo em até 10 dias e
     boletos emitidos que ainda não foram enviados."""
-    return consultas.alertas()
+    return _lista(consultas.alertas())
 
 
 @mcp.tool()
-def listar_imoveis(situacao: str | None = None) -> list:
+def listar_imoveis(situacao: str | None = None) -> dict:
     """Lista os imóveis com situação calculada e locatário atual.
     situacao (opcional): 'alugado', 'vago' ou 'em_manutencao'."""
-    return consultas.listar_imoveis(situacao)
+    return _lista(consultas.listar_imoveis(situacao))
 
 
 @mcp.tool()
@@ -68,10 +75,10 @@ def ficha_imovel(imovel_id: int) -> dict:
 
 
 @mcp.tool()
-def buscar_locatarios(texto: str) -> list:
+def buscar_locatarios(texto: str) -> dict:
     """Procura locatários por parte do nome ou do CPF/CNPJ. Use antes de cadastrar, para não
     duplicar, e para achar o locatário de um comprovante."""
-    return consultas.buscar_locatarios(texto)
+    return _lista(consultas.buscar_locatarios(texto))
 
 
 @mcp.tool()
@@ -82,9 +89,9 @@ def ficha_locatario(locatario_id: int) -> dict:
 
 
 @mcp.tool()
-def listar_contratos(ativos: bool | None = True) -> list:
+def listar_contratos(ativos: bool | None = True) -> dict:
     """Lista contratos. ativos=true (padrão): só ativos; false: só encerrados; null: todos."""
-    return consultas.listar_contratos(ativos)
+    return _lista(consultas.listar_contratos(ativos))
 
 
 @mcp.tool()
@@ -96,34 +103,34 @@ def extrato_contrato(contrato_id: int) -> dict:
 
 
 @mcp.tool()
-def listar_cobrancas(competencia: str | None = None, situacao: str | None = None) -> list:
+def listar_cobrancas(competencia: str | None = None, situacao: str | None = None) -> dict:
     """Lista cobranças. competencia (opcional): AAAA-MM. situacao (opcional): 'paga',
     'parcial', 'em_aberto', 'atrasada', 'isenta' ou 'cancelada'."""
-    return consultas.listar_cobrancas(competencia, situacao)
+    return _lista(consultas.listar_cobrancas(competencia, situacao))
 
 
 @mcp.tool()
-def cobrancas_sem_boleto(dias: int = 10) -> list:
+def cobrancas_sem_boleto(dias: int = 10) -> dict:
     """Cobranças que precisam de boleto: com saldo, sem boleto, vencendo em até `dias` dias
     (ou já vencidas). Traz nome, CPF/CNPJ e e-mail do locatário, valor, vencimento, multa% e
     juros% ao mês — tudo que é preciso para emitir o boleto no banco. Se 'reajuste_pendente'
     for verdadeiro, NÃO emita ainda: o reajuste anual do contrato não foi registrado; use
     sugerir_reajuste e peça a aprovação do Paulo primeiro."""
-    return consultas.cobrancas_sem_boleto(dias)
+    return _lista(consultas.cobrancas_sem_boleto(dias))
 
 
 @mcp.tool()
-def boletos_em_aberto() -> list:
+def boletos_em_aberto() -> dict:
     """Cobranças com boleto emitido e ainda não pagas. Use para conferir no banco quais
     foram pagos."""
-    return consultas.boletos_em_aberto()
+    return _lista(consultas.boletos_em_aberto())
 
 
 @mcp.tool()
-def inadimplentes() -> list:
+def inadimplentes() -> dict:
     """Locatários com cobranças atrasadas, por contrato: saldo, valor com multa e juros,
     maior atraso em dias e as cobranças."""
-    return consultas.inadimplentes()
+    return _lista(consultas.inadimplentes())
 
 
 @mcp.tool()
@@ -141,9 +148,9 @@ def historico_pagamentos(data_de: str | None = None, data_ate: str | None = None
 
 
 @mcp.tool()
-def listar_pendencias() -> list:
+def listar_pendencias() -> dict:
     """Pendências abertas: coisas que uma pessoa precisa conferir ou resolver."""
-    return consultas.listar_pendencias()
+    return _lista(consultas.listar_pendencias())
 
 
 @mcp.tool()

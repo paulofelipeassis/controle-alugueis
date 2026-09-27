@@ -19,7 +19,7 @@ def test_fluxo_completo_do_hermes():
     contrato = m.criar_contrato(imovel, locatario, "2026-10-05", "2027-10-04", 10, "1.500,00")["contrato_id"]
     assert consultas.obter("imovel", imovel)["iptu_anual_centavos"] == 123456
 
-    pendentes = [c for c in m.cobrancas_sem_boleto(dias=60) if c["contrato_id"] == contrato]
+    pendentes = [c for c in m.cobrancas_sem_boleto(dias=60)["itens"] if c["contrato_id"] == contrato]
     cobranca = pendentes[0]
     assert cobranca["locatario_email"] == "maria@x.com" and cobranca["valor"] == "R$ 1.500,00"
     m.registrar_boleto(cobranca["id"], "Caixa", "NN-123", "1049...", "https://banco/boleto.pdf")
@@ -90,9 +90,12 @@ def test_rede_com_cliente_mcp(servidor):
                 ok = await sessao.call_tool("cadastrar_imovel", {"grupo": "G", "unidade": "U", "endereco": "E"})
                 erro = await sessao.call_tool("cadastrar_locatario",
                                               {"nome": "X", "cpf_cnpj": "1", "email": "x@x.com"})
-                return ferramentas, ok, erro
+                vazia = await sessao.call_tool("listar_pendencias", {})
+                return ferramentas, ok, erro, vazia
 
-    ferramentas, ok, erro = asyncio.run(conversa())
+    ferramentas, ok, erro, vazia = asyncio.run(conversa())
+    # Lista vazia chega como resposta com quantidade 0, e não como resposta vazia.
+    assert not vazia.isError and '"quantidade": 0' in vazia.content[0].text
     assert len(ferramentas.tools) >= 29  # 29 do núcleo + as dos módulos opcionais
     assert not ok.isError and '"imovel_id"' in ok.content[0].text
     assert erro.isError and "CPF/CNPJ inválido" in erro.content[0].text

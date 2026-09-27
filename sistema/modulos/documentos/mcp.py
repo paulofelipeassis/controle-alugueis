@@ -13,9 +13,11 @@ def registrar_documento(entidade: str, entidade_id: int, tipo: str, caminho: str
     return {"documento_id": documentos.registrar(HERMES, entidade, entidade_id, tipo, caminho, descricao)}
 
 
-def listar_documentos(entidade: str, entidade_id: int) -> list:
-    """Documentos ligados a um 'imovel', 'locatario' ou 'contrato' (tipo e caminho)."""
-    return documentos.listar(entidade, entidade_id)
+def listar_documentos(entidade: str, entidade_id: int) -> dict:
+    """Documentos ligados a um 'imovel', 'locatario' ou 'contrato' (tipo e caminho), como
+    {"quantidade", "itens"}."""
+    itens = documentos.listar(entidade, entidade_id)
+    return {"quantidade": len(itens), "itens": itens}
 
 
 def registrar(mcp):

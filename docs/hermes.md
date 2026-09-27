@@ -17,6 +17,8 @@ para uma pessoa olhar, em vez de adivinhar.
 
 - Valores em reais, como texto no formato brasileiro: `"1.500,00"`.
 - Datas: `AAAA-MM-DD` (ex.: `2026-10-10`).
+- Listas vêm como `{"quantidade": N, "itens": [...]}`. `quantidade: 0` quer dizer que não
+  há nada (por exemplo, nenhuma pendência), não que houve erro.
 - Competência (mês da cobrança): `AAAA-MM`. A cobrança de outubro é a que **vence** em
   outubro.
 - Arquivos: caminho **relativo à pasta de documentos** (ex.:
