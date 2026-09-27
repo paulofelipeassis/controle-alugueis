@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo, documentos %}
+{% block conteudo %}
+<h2>{{ i.nome }} {{ selo(i.situacao) }}</h2>
+<p>{{ i.endereco }}</p>
+<ul>
+  {% if i.iptu_anual_centavos %}<li>IPTU anual: {{ i.iptu_anual }}</li>{% endif %}
+  {% if i.medidor_saneago %}<li>Medidor Saneago: {{ i.medidor_saneago }}</li>{% endif %}
+  {% if i.medidor_enel %}<li>Medidor Enel: {{ i.medidor_enel }}</li>{% endif %}
+  {% if i.observacoes %}<li>{{ i.observacoes }}</li>{% endif %}
+</ul>
+<div class="acoes">
+  <a role="button" class="outline" href="/imoveis/{{ i.id }}/editar">Editar</a>
+  {% if not i.contrato_atual %}<a role="button" href="/contratos/novo?imovel_id={{ i.id }}">Novo contrato</a>{% endif %}
+</div>
+<h3>Contratos</h3>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Locatário</th><th>Início</th><th>Fim</th><th>Situação</th></tr></thead>
+  <tbody>
+  {% for c in i.contratos %}
+  <tr><td><a href="/contratos/{{ c.id }}">{{ c.locatario_nome }}</a></td><td>{{ c.data_inicio|data }}</td>
+      <td>{{ (c.data_encerramento or c.data_fim_prevista)|data }}</td><td>{{ selo(c.status) }}</td></tr>
+  {% else %}<tr><td colspan="4">Nenhum contrato.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{{ documentos(i.documentos, "imovel", i.id, "/imoveis/" ~ i.id) }}
+{% if not i.contratos %}
+<form method="post" action="/imoveis/{{ i.id }}/apagar" onsubmit="return confirm('Apagar este imóvel?')">
+  <button type="submit" class="secondary outline">Apagar imóvel</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -9,6 +9,10 @@ from zoneinfo import ZoneInfo
 from sistema import config
 
 
+def maiuscula(texto):
+    return texto[:1].upper() + texto[1:]
+
+
 class ErroDeNegocio(Exception):
     """Erro com mensagem em português, para mostrar à pessoa ou ao Hermes."""
 
@@ -34,7 +38,7 @@ def para_data(valor, campo="data"):
             return datetime.strptime(texto, formato).date()
         except ValueError:
             pass
-    raise ErroDeNegocio(f"{campo.capitalize()} inválida: '{texto}'. Use o formato AAAA-MM-DD.")
+    raise ErroDeNegocio(f"{maiuscula(campo)} inválida: '{texto}'. Use o formato AAAA-MM-DD.")
 
 
 def somar_meses(data, meses):
@@ -94,9 +98,9 @@ def reais_para_centavos(valor, campo="valor"):
     try:
         reais = Decimal(texto)
     except InvalidOperation:
-        raise ErroDeNegocio(f"{campo.capitalize()} inválido: '{valor}'. Use o formato 1.234,56.") from None
+        raise ErroDeNegocio(f"{maiuscula(campo)} inválido: '{valor}'. Use o formato 1.234,56.") from None
     if reais < 0:
-        raise ErroDeNegocio(f"{campo.capitalize()} não pode ser negativo.")
+        raise ErroDeNegocio(f"{maiuscula(campo)} não pode ser negativo.")
     return int((reais * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 

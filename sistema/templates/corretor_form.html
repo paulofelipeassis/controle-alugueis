@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, texto %}
+{% block conteudo %}
+<h2>{% if editar %}Editar corretor{% else %}Novo corretor{% endif %}</h2>
+<form method="post">
+  {{ campo("nome", "Nome", dados, obrigatorio=True) }}
+  {{ campo("telefone", "Telefone", dados, tipo="tel") }}
+  {{ campo("email", "E-mail", dados, tipo="email") }}
+  {{ texto("observacoes", "Observações", dados) }}
+  <button type="submit">Salvar</button>
+</form>
+{% if editar %}
+<form method="post" action="/corretores/{{ editar }}/apagar" onsubmit="return confirm('Apagar este corretor?')">
+  <button type="submit" class="secondary outline">Apagar corretor</button>
+</form>
+{% endif %}
+{% endblock %}

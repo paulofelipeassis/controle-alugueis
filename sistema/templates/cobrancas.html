@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo %}
+{% block conteudo %}
+<h2>Cobranças</h2>
+<form method="get" class="grid">
+  <label>Mês <input type="month" name="competencia" value="{{ competencia }}"></label>
+  <label>Situação
+    <select name="situacao"><option value="">Todas</option>
+      {% for v, r in SITUACOES_COBRANCA %}<option value="{{ v }}" {% if situacao == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>&nbsp;<button type="submit">Filtrar</button></label>
+</form>
+<p>{{ cobrancas|length }} cobrança(s) · saldo em aberto: <strong>{{ total|reais }}</strong></p>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Mês</th><th>Situação</th><th>Imóvel</th><th class="num">Saldo</th><th>Locatário</th><th>Vencimento</th><th class="num">Valor</th><th>Boleto</th></tr></thead>
+  <tbody>
+  {% for c in cobrancas|reverse %}
+  <tr><td><a href="/cobrancas/{{ c.id }}">{{ c.competencia|comp }}</a></td><td>{{ selo(c.situacao_calculada) }}</td>
+      <td>{{ c.imovel_nome }}</td><td class="num">{{ c.saldo }}</td><td>{{ c.locatario_nome }}</td>
+      <td>{{ c.vencimento|data }}</td><td class="num">{{ c.valor }}</td>
+      <td>{% if c.boleto_identificador %}{% if c.boleto_enviado_em %}enviado{% else %}não enviado{% endif %}{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8">Nenhuma cobrança.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

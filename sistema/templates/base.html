@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Controle de Aluguéis{% endblock %}</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <link rel="stylesheet" href="/static/estilo.css">
+</head>
+<body>
+<header class="container">
+  <nav class="topo">
+    <ul><li><a href="/"><strong>🏠 Aluguéis</strong></a></li></ul>
+    {% if usuario %}
+    <ul>
+      <li>
+        <details class="dropdown">
+          <summary>Menu</summary>
+          <ul dir="rtl">
+            <li><a href="/">Painel</a></li>
+            <li><a href="/pagamentos/novo">Lançar pagamento</a></li>
+            <li><a href="/cobrancas">Cobranças</a></li>
+            <li><a href="/pagamentos">Histórico financeiro</a></li>
+            <li><a href="/pendencias">Pendências</a></li>
+            <li><a href="/contratos">Contratos</a></li>
+            <li><a href="/imoveis">Imóveis</a></li>
+            <li><a href="/locatarios">Locatários</a></li>
+            <li><a href="/corretores">Corretores</a></li>
+            <li><a href="/auditoria">Auditoria</a></li>
+            <li><a href="/senha">Trocar senha</a></li>
+            <li><a href="/sair">Sair ({{ usuario.nome }})</a></li>
+          </ul>
+        </details>
+      </li>
+    </ul>
+    {% endif %}
+  </nav>
+</header>
+<main class="container">
+  {% for m in mensagens %}<div class="msg {{ m.tipo }}">{{ m.texto }}</div>{% endfor %}
+  {% if erro %}<div class="msg erro">{{ erro }}</div>{% endif %}
+  {% block conteudo %}{% endblock %}
+</main>
+</body>
+</html>

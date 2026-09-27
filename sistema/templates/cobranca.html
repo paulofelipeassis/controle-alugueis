@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo, dinheiro %}
+{% block conteudo %}
+<h2>Cobrança {{ c.competencia|comp }} {{ selo(c.situacao_calculada) }}</h2>
+<p><a href="/contratos/{{ contrato.id }}">{{ contrato.imovel_nome }} — {{ contrato.locatario_nome }}</a></p>
+<ul>
+  <li>Vencimento: {{ c.vencimento|data }}</li>
+  <li>Valor: <strong>{{ c.valor }}</strong> · pago: {{ c.pago }} · saldo: <strong>{{ c.saldo }}</strong></li>
+  {% if c.situacao_calculada == "atrasada" %}<li>{{ c.dias_atraso }} dias de atraso · com multa e juros: <strong>{{ c.valor_atualizado }}</strong></li>{% endif %}
+  {% if c.motivo_situacao %}<li>Motivo: {{ c.motivo_situacao }}</li>{% endif %}
+  {% if c.boleto_identificador %}
+  <li>Boleto {{ c.boleto_banco }} nº {{ c.boleto_identificador }}, emitido em {{ c.boleto_emitido_em|data }}
+    · {% if c.boleto_enviado_em %}enviado em {{ c.boleto_enviado_em|data }}{% else %}<strong>não enviado</strong>{% endif %}
+    {% if c.boleto_link %}· <a href="{{ c.boleto_link }}" target="_blank" rel="noopener">abrir boleto</a>{% endif %}
+    {% if c.boleto_linha_digitavel %}<br><small>{{ c.boleto_linha_digitavel }}</small>{% endif %}</li>
+  {% else %}<li>Sem boleto</li>{% endif %}
+</ul>
+
+{% if c.situacao == "normal" and c.saldo_centavos > 0 %}
+<div class="acoes"><a role="button" href="/pagamentos/novo?cobranca_id={{ c.id }}">Lançar pagamento</a></div>
+{% endif %}
+
+<h3>Pagamentos</h3>
+{% for p in c.pagamentos %}
+<article>
+  {% if p.cancelado_em %}<s>{% endif %}{{ p.data_pagamento|data }} · <strong>{{ p.valor }}</strong> · {{ dict(FORMAS).get(p.forma) }}
+  {% if p.identificador_externo %}· {{ p.identificador_externo }}{% endif %}{% if p.cancelado_em %}</s>{% endif %}
+  <br><small>Registrado por {{ p.registrado_por }} em {{ p.registrado_em|data }}{% if p.observacao %} · {{ p.observacao }}{% endif %}</small>
+  {% if p.comprovante_caminho %}<br><small>Comprovante: {{ p.comprovante_caminho.split('/')[-1] }}</small>{% endif %}
+  {% if p.cancelado_em %}<br><small>Cancelado em {{ p.cancelado_em|data }}: {{ p.motivo_cancelamento }}</small>
+  {% else %}
+  <details class="acao"><summary><small>Cancelar este pagamento</small></summary>
+    <form method="post" action="/pagamentos/{{ p.id }}/cancelar">
+      <input type="hidden" name="voltar" value="/cobrancas/{{ c.id }}">
+      <label>Motivo * <input type="text" name="motivo" required></label>
+      <button type="submit" class="secondary">Cancelar pagamento</button>
+    </form>
+  </details>
+  {% endif %}
+</article>
+{% else %}<p>Nenhum pagamento.</p>{% endfor %}
+
+{% if c.situacao == "normal" %}
+<h3>Ações</h3>
+<details class="acao"><summary>{% if c.boleto_identificador %}Registrar segunda via do boleto{% else %}Registrar boleto à mão{% endif %}</summary>
+  <form method="post" action="/cobrancas/{{ c.id }}/boleto">
+    <label>Banco * <input type="text" name="banco" value="Caixa" required></label>
+    <label>Nosso número (identificador) * <input type="text" name="identificador" required></label>
+    <label>Linha digitável <input type="text" name="linha_digitavel"></label>
+    <label>Link do boleto <input type="url" name="link"></label>
+    {% if c.boleto_identificador %}<input type="hidden" name="substituir" value="on">{% endif %}
+    <button type="submit">Registrar boleto</button>
+  </form>
+</details>
+{% if c.boleto_identificador and not c.boleto_enviado_em %}
+<form method="post" action="/cobrancas/{{ c.id }}/enviado"><button type="submit" class="outline">Marcar boleto como enviado</button></form>
+{% endif %}
+{% if not c.pago_centavos %}
+<details class="acao"><summary>Mudar valor</summary>
+  <form method="post" action="/cobrancas/{{ c.id }}/valor">
+    {{ dinheiro("valor", "Novo valor", {"valor": c.valor_centavos|reais_campo}, obrigatorio=True) }}
+    <label>Motivo * <input type="text" name="motivo" required placeholder="Ex.: primeiro mês proporcional"></label>
+    <button type="submit">Salvar valor</button>
+  </form>
+</details>
+<details class="acao"><summary>Isentar</summary>
+  <form method="post" action="/cobrancas/{{ c.id }}/isentar">
+    <label>Motivo * <input type="text" name="motivo" required></label>
+    <button type="submit" class="secondary">Isentar cobrança</button>
+  </form>
+</details>
+<details class="acao"><summary>Cancelar cobrança</summary>
+  <form method="post" action="/cobrancas/{{ c.id }}/cancelar">
+    <label>Motivo * <input type="text" name="motivo" required></label>
+    <button type="submit" class="secondary">Cancelar cobrança</button>
+  </form>
+</details>
+{% endif %}
+{% endif %}
+{% endblock %}

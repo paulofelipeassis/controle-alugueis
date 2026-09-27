@@ -6,7 +6,7 @@ sufixo (ex.: `valor_centavos: 123456` e `valor: "R$ 1.234,56"`).
 from datetime import timedelta
 
 from sistema import db, regras, servicos
-from sistema.regras import ErroDeNegocio, para_data
+from sistema.regras import ErroDeNegocio, maiuscula, para_data
 
 ROTULOS_SITUACAO = {
     "paga": "Paga", "parcial": "Parcial", "em_aberto": "Em aberto", "atrasada": "Atrasada",
@@ -46,7 +46,7 @@ def obter(entidade, entidade_id):
     with db.leitura() as con:
         linha = con.execute(f"SELECT * FROM {tabelas[entidade]} WHERE id = ?", (entidade_id,)).fetchone()
     if linha is None:
-        raise ErroDeNegocio(f"{entidade.capitalize()} {entidade_id} não encontrado.")
+        raise ErroDeNegocio(f"{maiuscula(entidade)} {entidade_id} não encontrado.")
     return _com_reais(dict(linha))
 
 

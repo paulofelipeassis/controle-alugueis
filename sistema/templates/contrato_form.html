@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, texto, dinheiro %}
+{% block conteudo %}
+<h2>{% if editar %}Editar contrato{% else %}Novo contrato{% endif %}</h2>
+<form method="post">
+  {% if editar %}
+  <p><strong>{{ dados.imovel_nome }} — {{ dados.locatario_nome }}</strong><br>
+  <small>Datas, dia de vencimento e valor não mudam por aqui: use renovar, reajuste ou encerrar na página do contrato.</small></p>
+  {% else %}
+  <label>Imóvel (vago ou em manutenção) *
+    <select name="imovel_id" required>
+      <option value="">Escolha…</option>
+      {% for i in imoveis %}<option value="{{ i.id }}" {% if dados.get('imovel_id')|string == i.id|string %}selected{% endif %}>{{ i.nome }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Locatário * <small>(<a href="/locatarios/novo">cadastrar novo</a>)</small>
+    <select name="locatario_id" required>
+      <option value="">Escolha…</option>
+      {% for l in locatarios %}<option value="{{ l.id }}" {% if dados.get('locatario_id')|string == l.id|string %}selected{% endif %}>{{ l.nome }} ({{ l.cpf_cnpj }})</option>{% endfor %}
+    </select>
+  </label>
+  <div class="grid">
+    {{ campo("data_inicio", "Início", dados, tipo="date", obrigatorio=True) }}
+    {{ campo("data_fim_prevista", "Fim previsto", dados, tipo="date", obrigatorio=True) }}
+  </div>
+  <div class="grid">
+    {{ dinheiro("valor_aluguel", "Valor do aluguel", dados, obrigatorio=True) }}
+    {{ campo("dia_vencimento", "Dia do vencimento", dados, tipo="number", obrigatorio=True, extra='min="1" max="31"') }}
+  </div>
+  {% endif %}
+  <label>Corretor
+    <select name="corretor_id">
+      <option value="">Nenhum</option>
+      {% for c in corretores %}<option value="{{ c.id }}" {% if dados.get('corretor_id')|string == c.id|string %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}
+    </select>
+  </label>
+  <div class="grid">
+    {{ campo("multa_pct", "Multa por atraso (%)", dados, obrigatorio=True, extra='inputmode="decimal"') }}
+    {{ campo("juros_mes_pct", "Juros ao mês (%)", dados, obrigatorio=True, extra='inputmode="decimal"') }}
+  </div>
+  <div class="grid">
+    <label>Garantia
+      <select name="garantia_tipo">{% for v, r in GARANTIAS %}<option value="{{ v }}" {% if dados.get('garantia_tipo') == v %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+    </label>
+    {{ dinheiro("garantia_valor", "Valor da garantia", dados) }}
+  </div>
+  {{ texto("fiador", "Fiador (nome, CPF, contato)", dados) }}
+  {{ campo("indice_reajuste", "Índice de reajuste", dados, extra='list="indices"') }}
+  <datalist id="indices"><option value="IGP-M"><option value="IPCA"></datalist>
+  {{ texto("observacoes", "Observações", dados) }}
+  <button type="submit">Salvar</button>
+</form>
+{% endblock %}

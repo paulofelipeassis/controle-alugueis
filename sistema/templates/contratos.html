@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo %}
+{% block conteudo %}
+<h2>Contratos</h2>
+<div class="acoes">
+  <a role="button" href="/contratos/novo">Novo contrato</a>
+  <a role="button" class="outline" href="/contratos?status=ativos">Ativos</a>
+  <a role="button" class="outline" href="/contratos?status=encerrados">Encerrados</a>
+  <a role="button" class="outline" href="/contratos?status=todos">Todos</a>
+</div>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Imóvel</th><th>Locatário</th><th class="num">Aluguel</th><th>Vence dia</th><th>Fim</th><th>Situação</th></tr></thead>
+  <tbody>
+  {% for c in contratos %}
+  <tr><td><a href="/contratos/{{ c.id }}">{{ c.imovel_nome }}</a></td><td>{{ c.locatario_nome }}</td>
+      <td class="num">{{ c.valor_atual }}</td><td>{{ c.dia_vencimento }}</td>
+      <td>{{ (c.data_encerramento or c.data_fim_prevista)|data }}{% if c.prazo_vencido %} ⚠️{% endif %}</td>
+      <td>{{ selo(c.status) }}</td></tr>
+  {% else %}<tr><td colspan="6">Nenhum contrato.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

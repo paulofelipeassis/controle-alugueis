@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo %}
+{% block conteudo %}
+<h2>Painel</h2>
+{% if p.pendencias_abertas %}
+<div class="msg aviso"><a href="/pendencias"><strong>{{ p.pendencias_abertas }} pendência(s)</strong> para conferir →</a></div>
+{% endif %}
+<div class="numeros">
+  <article><small>Ocupação</small><strong>{{ p.ocupacao_pct }}%</strong>
+    <small>{{ p.imoveis_alugados }} alugados, {{ p.imoveis_vagos }} vagos{% if p.imoveis_em_manutencao %}, {{ p.imoveis_em_manutencao }} em manutenção{% endif %}</small></article>
+  <article><small>Devido em {{ p.resumo_do_mes.competencia|comp }}</small><strong>{{ p.resumo_do_mes.devido }}</strong></article>
+  <article><small>Recebido no mês</small><strong>{{ p.resumo_do_mes.recebido }}</strong></article>
+  <article><small>Falta receber no mês</small><strong>{{ p.resumo_do_mes.falta_receber }}</strong></article>
+  <article><small>Total atrasado</small><strong>{{ p.total_atrasado }}</strong></article>
+</div>
+<div class="acoes"><a role="button" href="/pagamentos/novo">Lançar pagamento</a></div>
+
+<h3>Atrasados</h3>
+{% if p.inadimplentes %}
+<div class="overflow-auto"><table>
+  <thead><tr><th>Imóvel</th><th>Locatário</th><th>Meses</th><th class="num">Saldo</th><th class="num">Com multa e juros</th><th class="num">Atraso</th></tr></thead>
+  <tbody>
+  {% for g in p.inadimplentes %}
+  <tr><td><a href="/contratos/{{ g.contrato_id }}">{{ g.imovel_nome }}</a></td>
+      <td><a href="/locatarios/{{ g.locatario_id }}">{{ g.locatario_nome }}</a><br><small>{{ g.locatario_telefone or '' }}</small></td>
+      <td>{% for c in g.cobrancas %}<a href="/cobrancas/{{ c.id }}">{{ c.competencia|comp }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td class="num">{{ g.saldo }}</td><td class="num">{{ g.valor_atualizado }}</td><td class="num">{{ g.maior_atraso_dias }} dias</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p>Nenhum atraso. 🎉</p>{% endif %}
+
+<h3>Alertas</h3>
+{% if p.alertas %}
+<ul>{% for a in p.alertas %}<li><a href="{% if a.cobranca_id %}/cobrancas/{{ a.cobranca_id }}{% else %}/contratos/{{ a.contrato_id }}{% endif %}">{{ a.mensagem }}</a></li>{% endfor %}</ul>
+{% else %}<p>Nenhum alerta.</p>{% endif %}
+
+<h3>Gráficos</h3>
+<div id="grafico-recebido" class="grafico"></div>
+<div id="grafico-imoveis" class="grafico"></div>
+<script src="/static/plotly-basic.min.js"></script>
+<script>
+  const recebido = {{ recebido|tojson }};
+  const config = {displayModeBar: false, responsive: true};
+  Plotly.newPlot("grafico-recebido", [{
+    type: "bar", x: recebido.map(r => r.mes.slice(5) + "/" + r.mes.slice(0, 4)),
+    y: recebido.map(r => r.recebido_centavos / 100), text: recebido.map(r => r.recebido), hoverinfo: "text",
+    marker: {color: "#1e88e5"}
+  }], {title: {text: "Recebido por mês"}, margin: {t: 40, l: 50, r: 10, b: 60}, yaxis: {tickprefix: "R$ "}}, config);
+  Plotly.newPlot("grafico-imoveis", [{
+    type: "pie", hole: 0.5, labels: ["Alugados", "Vagos", "Em manutenção"],
+    values: [{{ p.imoveis_alugados }}, {{ p.imoveis_vagos }}, {{ p.imoveis_em_manutencao }}],
+    marker: {colors: ["#43a047", "#1e88e5", "#fb8c00"]}
+  }], {title: {text: "Imóveis"}, margin: {t: 40, l: 10, r: 10, b: 10}}, config);
+</script>
+{% endblock %}

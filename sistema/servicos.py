@@ -778,13 +778,15 @@ def registrar_documento(quem, entidade, entidade_id, tipo, caminho, descricao=No
         return cur.lastrowid
 
 
-def salvar_documento(quem, entidade, entidade_id, tipo, nome_arquivo, conteudo, descricao=None):
-    """Upload pela web: grava o arquivo na pasta certa e registra."""
+def salvar_documento(quem, entidade, entidade_id, tipo, nome_arquivo, conteudo, descricao=None, nome_base=None):
+    """Upload pela web: grava o arquivo na pasta certa e registra. nome_base troca o nome sugerido."""
     tipo = _obrigatorio(tipo, "tipo do documento")
     pasta = pasta_documento(entidade, entidade_id)
     original = Path(_obrigatorio(nome_arquivo, "arquivo"))
     extensao = original.suffix.lower()
-    if tipo in NOMES_FIXOS:
+    if nome_base:
+        base = regras.nome_pasta(nome_base)
+    elif tipo in NOMES_FIXOS:
         base = tipo
     elif tipo == "aditivo":
         base = f"aditivo-{regras.competencia_de(regras.hoje())}"

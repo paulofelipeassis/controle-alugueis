@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selo, documentos, dinheiro %}
+{% block conteudo %}
+<h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
+<p><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · {{ c.locatario_telefone }}{% endif %}</p>
+{% if c.prazo_vencido %}<div class="msg aviso">O prazo terminou em {{ c.data_fim_prevista|data }}. O contrato continua valendo e gerando cobranças até ser renovado ou encerrado.</div>{% endif %}
+<ul>
+  <li>Aluguel atual: <strong>{{ c.valor_atual }}</strong> (desde {{ c.valor_atual_desde|data }}), vence todo dia {{ c.dia_vencimento }}</li>
+  <li>Início {{ c.data_inicio|data }} · fim previsto {{ c.data_fim_prevista|data }}{% if c.data_encerramento %} · encerrado em {{ c.data_encerramento|data }} ({{ c.motivo_encerramento }}){% endif %}</li>
+  <li>Multa {{ c.multa_pct|pct }}% · juros {{ c.juros_mes_pct|pct }}% ao mês · reajuste: {{ c.indice_reajuste or 'não informado' }}</li>
+  <li>Garantia: {{ dict(GARANTIAS).get(c.garantia_tipo) }}{% if c.garantia_valor_centavos %} de {{ c.garantia_valor }}{% endif %}{% if c.fiador %} · Fiador: {{ c.fiador }}{% endif %}</li>
+  {% if c.corretor_nome %}<li>Corretor: {{ c.corretor_nome }}</li>{% endif %}
+  {% if c.observacoes %}<li>{{ c.observacoes }}</li>{% endif %}
+</ul>
+<div class="numeros">
+  <article><small>Total devido</small><strong>{{ c.total_devido }}</strong></article>
+  <article><small>Total pago</small><strong>{{ c.total_pago }}</strong></article>
+  <article><small>Atrasado</small><strong>{{ c.total_atrasado }}</strong></article>
+</div>
+
+<div class="acoes"><a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a></div>
+{% if c.status == "ativo" %}
+<details class="acao"><summary>Registrar reajuste</summary>
+  <form method="post" action="/contratos/{{ c.id }}/reajuste">
+    {{ dinheiro("novo_valor", "Novo valor", {}, obrigatorio=True) }}
+    <label>Vale a partir de * <input type="date" name="vigente_desde" required></label>
+    <label>Motivo <input type="text" name="motivo" placeholder="Ex.: IGP-M 12 meses"></label>
+    <button type="submit">Registrar reajuste</button>
+  </form>
+</details>
+<details class="acao"><summary>Renovar</summary>
+  <form method="post" action="/contratos/{{ c.id }}/renovar">
+    <label>Nova data de fim * <input type="date" name="nova_data_fim" required></label>
+    {{ dinheiro("novo_valor", "Novo valor (opcional)", {}) }}
+    <label>Novo valor vale a partir de <input type="date" name="vigente_desde"><small>Em branco: dia seguinte ao fim atual.</small></label>
+    <button type="submit">Renovar</button>
+  </form>
+</details>
+<details class="acao"><summary>Encerrar</summary>
+  <form method="post" action="/contratos/{{ c.id }}/encerrar" onsubmit="return confirm('Encerrar este contrato?')">
+    <label>Data de encerramento * <input type="date" name="data_encerramento" required></label>
+    <label>Motivo * <input type="text" name="motivo" required></label>
+    <small>Cobranças que vencem depois dessa data e não foram pagas serão canceladas.</small>
+    <button type="submit" class="secondary">Encerrar contrato</button>
+  </form>
+</details>
+{% endif %}
+
+<h3>Cobranças</h3>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Mês</th><th>Situação</th><th class="num">Saldo</th><th>Vencimento</th><th class="num">Valor</th><th class="num">Pago</th><th>Boleto</th></tr></thead>
+  <tbody>
+  {% for cb in c.cobrancas|reverse %}
+  <tr><td><a href="/cobrancas/{{ cb.id }}">{{ cb.competencia|comp }}</a></td><td>{{ selo(cb.situacao_calculada) }}</td>
+      <td class="num">{{ cb.saldo }}</td><td>{{ cb.vencimento|data }}</td>
+      <td class="num">{{ cb.valor }}</td><td class="num">{{ cb.pago }}</td>
+      <td>{% if cb.boleto_identificador %}{{ cb.boleto_identificador }}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7">Nenhuma cobrança ainda.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+
+<h3>Histórico de valores</h3>
+<ul>{% for v in c.valores %}<li>{{ v.valor }} desde {{ v.vigente_desde|data }} ({{ v.motivo }})</li>{% endfor %}</ul>
+
+{{ documentos(c.documentos, "contrato", c.id, "/contratos/" ~ c.id) }}
+
+<form method="post" action="/contratos/{{ c.id }}/apagar" onsubmit="return confirm('Apagar este contrato? Só funciona se foi cadastrado por engano, sem pagamentos.')">
+  <button type="submit" class="secondary outline">Apagar contrato (cadastrado por engano)</button>
+</form>
+{% endblock %}

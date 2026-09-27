@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block conteudo %}
+<h2>Corretores</h2>
+<div class="acoes"><a role="button" href="/corretores/novo">Novo corretor</a></div>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th></th></tr></thead>
+  <tbody>
+  {% for c in corretores %}
+  <tr><td>{{ c.nome }}</td><td>{{ c.telefone or '' }}</td><td>{{ c.email or '' }}</td>
+      <td><a href="/corretores/{{ c.id }}/editar">Editar</a></td></tr>
+  {% else %}<tr><td colspan="4">Nenhum corretor.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}
