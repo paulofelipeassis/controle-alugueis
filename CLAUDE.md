@@ -31,6 +31,7 @@ python -m pytest sistema -q                    # all tests, core + modules (uses
 uvicorn sistema.web:app --reload               # web pages on :8000
 MCP_TOKEN=x python -m sistema.mcp_server       # MCP on :8001/mcp
 python -m scripts.demo                         # prints a sample dashboard
+python -m scripts.simular                      # 15 simulated months, 20 properties, checks every month
 python -m scripts.criar_usuario                # creates a login
 ```
 
