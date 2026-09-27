@@ -33,7 +33,9 @@ def test_apagar_cadastro_apaga_a_ligacao(cenario):
 
 def test_ferramentas_do_hermes(cenario):
     documentos.salvar("t", "locatario", cenario["locatario"], "documento-pessoal", "rg.jpg", b"img")
-    lista = ferramentas.listar_documentos("locatario", cenario["locatario"])
+    resposta = ferramentas.listar_documentos("locatario", cenario["locatario"])
+    assert resposta["quantidade"] == 1
+    lista = resposta["itens"]
     assert lista[0]["caminho"] == "locatarios/12345678900 - Maria Souza/rg.jpg"
     assert ferramentas.registrar_documento("locatario", cenario["locatario"], "documento-pessoal",
                                            lista[0]["caminho"])["documento_id"] == lista[0]["id"]
