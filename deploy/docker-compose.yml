@@ -1,0 +1,48 @@
+# Sistema de controle de aluguéis. Valores vêm do arquivo .env ao lado deste
+# (copie .env.exemplo para .env e preencha NO SERVIDOR; nunca commitar o .env).
+# Subir/atualizar:  docker compose up -d --build   (dentro da pasta deploy/)
+
+x-base: &base
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: controle-alugueis
+  env_file: .env
+  restart: unless-stopped
+  volumes:
+    - ${PASTA_DADOS}:/dados
+    - ${PASTA_DOCUMENTOS}:/documentos
+
+services:
+  web:
+    <<: *base
+    networks: [traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_REDE}
+      - traefik.http.routers.alugueis.rule=Host(`${DOMINIO}`)
+      - traefik.http.routers.alugueis.entrypoints=${TRAEFIK_ENTRYPOINT}
+      - traefik.http.routers.alugueis.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.alugueis.loadbalancer.server.port=8000
+
+  mcp:
+    <<: *base
+    command: ["python", "-m", "sistema.mcp_server"]
+    # Sem labels do Traefik: não fica exposto na internet, só na rede do Hermes.
+    networks:
+      hermes:
+        aliases: [alugueis-mcp]
+
+  backup:
+    <<: *base
+    command: ["python", "-m", "scripts.backup", "--loop"]
+    # Rede comum (com internet) para enviar ao Google Drive.
+    network_mode: bridge
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_REDE}
+  hermes:
+    external: true
+    name: ${HERMES_REDE}

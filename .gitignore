@@ -12,3 +12,10 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# Sistema novo: banco, documentos e segredos do servidor
+dados/
+*.db
+*.db-wal
+*.db-shm
+.env

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, texto %}
+{% block conteudo %}
+<h2>{% if editar %}Editar locatário{% else %}Novo locatário{% endif %}</h2>
+<form method="post">
+  {{ campo("nome", "Nome ou razão social", dados, obrigatorio=True) }}
+  {{ campo("cpf_cnpj", "CPF ou CNPJ", dados, obrigatorio=True, extra='inputmode="numeric"') }}
+  {{ campo("email", "E-mail (os boletos vão para ele)", dados, tipo="email", obrigatorio=True) }}
+  {{ campo("telefone", "Telefone", dados, tipo="tel") }}
+  {{ texto("observacoes", "Observações", dados) }}
+  <button type="submit">Salvar</button>
+</form>
+{% endblock %}

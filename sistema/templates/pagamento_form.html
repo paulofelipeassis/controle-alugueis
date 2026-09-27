@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, texto, dinheiro %}
+{% block conteudo %}
+<h2>Lançar pagamento</h2>
+{% if not cobrancas %}<p>Nenhuma cobrança em aberto.</p>{% else %}
+<form method="post" enctype="multipart/form-data">
+  <label>Cobrança (imóvel — locatário — mês) *
+    <select name="cobranca_id" required>
+      <option value="">Escolha…</option>
+      {% for c in cobrancas %}
+      <option value="{{ c.id }}" {% if dados.get('cobranca_id')|string == c.id|string %}selected{% endif %}>
+        {{ c.imovel_nome }} — {{ c.locatario_nome }} — {{ c.competencia|comp }} (vence {{ c.vencimento|data }}, saldo {{ c.saldo }}{% if c.situacao_calculada == 'atrasada' %}, com multa e juros {{ c.valor_atualizado }}{% endif %})
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="grid">
+    {{ campo("data_pagamento", "Data do pagamento", dados, tipo="date", obrigatorio=True) }}
+    {{ dinheiro("valor", "Valor pago", dados, obrigatorio=True) }}
+  </div>
+  <label>Forma
+    <select name="forma">{% for v, r in FORMAS %}<option value="{{ v }}" {% if dados.get('forma') == v %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+  </label>
+  {{ campo("identificador_externo", "Código da transação ou nosso número (opcional)", dados, ajuda="Evita lançar o mesmo pagamento duas vezes.") }}
+  <label>Comprovante (opcional) <input type="file" name="comprovante"></label>
+  {{ texto("observacao", "Observação", dados) }}
+  <button type="submit">Registrar pagamento</button>
+</form>
+{% endif %}
+{% endblock %}

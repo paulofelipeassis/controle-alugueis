@@ -91,9 +91,27 @@ Regras:
   indeterminado (Lei 8.245/1991, arts. 46 §1º, 47 e 56, parágrafo único).
 - **Renovar** = mudar a data de fim prevista do **mesmo** contrato (e, se houver, registrar
   novo valor). Não se cria contrato novo para renovação.
-- **Reajuste** = novo valor com data "vigente desde". Alerta quando faz 12 meses do último
-  valor. A lei proíbe reajuste com periodicidade menor que 1 ano (Lei 10.192/2001, art. 2º
-  §1º). O cálculo do índice fica com a pessoa ou com o Hermes; o sistema só guarda o valor.
+- **Reajuste anual: o sistema sugere, uma pessoa registra** (decisão do Paulo, 27/09/2026):
+  - O próximo reajuste é **12 meses depois do último valor** (a lei proíbe periodicidade menor
+    que 1 ano: Lei 10.192/2001, art. 2º §1º). Até 30 dias antes, aparece o alerta.
+  - Para **IPCA** e **IGP-M**, ao abrir "Calcular reajuste" no contrato (ou pelo Hermes), o
+    sistema busca **naquele momento** as **últimas 12 variações publicadas** no Banco Central
+    e sugere o novo valor. Não precisa bater exatamente com o mês do aniversário. Não há busca
+    diária nem cópia dos índices no banco.
+  - **Índice acumulado negativo ou zero: o valor se mantém.**
+  - **Nada muda sem uma pessoa registrar.** Dá para trocar o valor por um combinado, ou
+    registrar o mesmo valor para não reajustar naquele ano.
+  - **O 13º boleto tem que sair reajustado:** as cobranças que vencem a partir do aniversário
+    ficam marcadas "reajuste pendente" até o reajuste do ano ser registrado, e o Hermes não
+    emite boleto delas antes disso.
+  - Outro índice (ex.: INPC) ou Banco Central fora do ar: registrar o valor à mão.
+  - O cálculo pelo índice é um **módulo opcional** (`sistema/modulos/reajuste/`). O alerta, a
+    marcação do 13º boleto e o registro do reajuste são do núcleo.
+- **Contrato que já existia antes do sistema:** é cadastrado com a **data de início
+  verdadeira** e o **valor atual**, mais a **data desde quando vale o valor atual** (data do
+  último reajuste). Esta última é obrigatória se o contrato começou há mais de 1 ano, porque é
+  dela que sai o próximo reajuste. Não são geradas cobranças de meses anteriores a
+  `INICIO_COBRANCAS`, então não aparecem dívidas antigas.
 - **Encerrar** = informar data e motivo. As cobranças com vencimento depois do encerramento
   e sem pagamento são canceladas. Se alguma já tinha boleto emitido, o sistema cria uma
   **pendência** "cancelar boleto no banco". Dívidas anteriores continuam em aberto.
@@ -185,6 +203,8 @@ dizendo o que foi feito. Aparecem em destaque no painel.
   dono da convenção: ele calcula a pasta certa de cada documento e o Hermes pergunta ao
   sistema onde salvar.
 - Upload também pela web (redundância).
+- É um **módulo opcional** (`sistema/modulos/documentos/`): pode ser removido sem afetar o
+  resto. Os comprovantes de pagamento não dependem dele (ficam no próprio pagamento).
 - A convenção foi enviada ao Hermes **como sugestão**: ele deve comparar com a estrutura
   que já usa e confirmar diferenças com o Paulo. Não dar ordens ao Hermes sobre isso.
 
@@ -211,7 +231,7 @@ Os mesmos para a web e para o Hermes:
 - O Hermes **nunca** acessa o banco diretamente. Ele usa um **servidor MCP** do sistema, com
   ferramentas **estreitas** (cada uma faz uma coisa só, com regras aplicadas pelo sistema).
 - O que o Hermes **pode**: consultar tudo; cadastrar imóvel, locatário, corretor e contrato;
-  registrar reajuste, renovação e encerramento; registrar boleto e envio; registrar
+  registrar reajuste, renovação e encerramento; calcular a sugestão de reajuste; registrar boleto e envio; registrar
   pagamento; anexar documento; criar pendência.
 - O que o Hermes **não pode** (só pessoas, pela web): cancelar pagamento, isentar ou
   cancelar cobrança, editar valor de cobrança, resolver pendência, apagar qualquer coisa,

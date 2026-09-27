@@ -1,0 +1,27 @@
+/* Ajustes pequenos sobre o Pico CSS. */
+:root { --pico-font-size: 100%; }
+body > main { padding-top: 0.5rem; }
+nav.topo { border-bottom: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
+nav.topo details.dropdown summary { min-width: 7rem; }
+.msg { padding: 0.75rem 1rem; border-radius: var(--pico-border-radius); margin-bottom: 1rem; }
+.msg.ok { background: #e6f4ea; color: #1e4620; }
+.msg.erro { background: #fdecea; color: #611a15; }
+.msg.aviso { background: #fff4e5; color: #663c00; }
+.selo { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 1rem; font-size: 0.8rem;
+        white-space: nowrap; background: #eceff1; color: #37474f; }
+.selo.paga, .selo.alugado, .selo.ativo { background: #e6f4ea; color: #1e4620; }
+.selo.atrasada { background: #fdecea; color: #611a15; }
+.selo.parcial, .selo.em_manutencao { background: #fff4e5; color: #663c00; }
+.selo.vago, .selo.em_aberto { background: #e3f2fd; color: #0d3c61; }
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem;
+           margin-bottom: 1.5rem; }
+.numeros article { margin: 0; padding: 0.75rem 1rem; }
+.numeros strong { display: block; font-size: 1.2rem; white-space: nowrap; }
+.numeros small { color: var(--pico-muted-color); }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.acoes > * { margin: 0; }
+details.acao { margin-bottom: 0.5rem; }
+details.acao > summary { font-weight: 600; }
+form.inline { display: inline; }
+.grafico { width: 100%; min-height: 280px; }

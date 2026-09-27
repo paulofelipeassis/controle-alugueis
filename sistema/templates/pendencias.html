@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block conteudo %}
+<h2>Pendências</h2>
+<div class="acoes">
+  <a role="button" class="outline" href="/pendencias">Abertas</a>
+  <a role="button" class="outline" href="/pendencias?todas=1">Todas</a>
+</div>
+{% for p in pendencias %}
+<article>
+  <strong>{{ p.tipo|replace('_', ' ')|capitalize }}</strong> <small>· {{ p.criada_em|data }} · por {{ p.criada_por }}</small>
+  <p>{{ p.descricao }}</p>
+  {% if p.entidade == 'cobranca' %}<p><a href="/cobrancas/{{ p.entidade_id }}">Ver cobrança</a></p>
+  {% elif p.entidade == 'contrato' %}<p><a href="/contratos/{{ p.entidade_id }}">Ver contrato</a></p>{% endif %}
+  {% if p.resolvida_em %}
+  <small>Resolvida por {{ p.resolvida_por }} em {{ p.resolvida_em|data }}: {{ p.resolucao }}</small>
+  {% else %}
+  <form method="post" action="/pendencias/{{ p.id }}/resolver">
+    <label>O que foi feito * <input type="text" name="resolucao" required></label>
+    <button type="submit">Marcar como resolvida</button>
+  </form>
+  {% endif %}
+</article>
+{% else %}<p>Nenhuma pendência. 🎉</p>{% endfor %}
+{% endblock %}

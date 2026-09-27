@@ -1,0 +1,20 @@
+{% macro campo(nome, rotulo, dados, tipo="text", obrigatorio=False, ajuda="", extra="") %}
+<label>{{ rotulo }}{% if obrigatorio %} *{% endif %}
+  <input type="{{ tipo }}" name="{{ nome }}" value="{{ dados.get(nome) if dados.get(nome) is not none else '' }}"
+         {% if obrigatorio %}required{% endif %} {{ extra|safe }}>
+  {% if ajuda %}<small>{{ ajuda }}</small>{% endif %}
+</label>
+{% endmacro %}
+
+{% macro texto(nome, rotulo, dados) %}
+<label>{{ rotulo }}
+  <textarea name="{{ nome }}" rows="2">{{ dados.get(nome) or '' }}</textarea>
+</label>
+{% endmacro %}
+
+{% macro dinheiro(nome, rotulo, dados, obrigatorio=False) %}
+{{ campo(nome, rotulo, dados, "text", obrigatorio, "Ex.: 1.500,00", 'inputmode="decimal" placeholder="0,00"') }}
+{% endmacro %}
+
+{% macro selo(situacao) %}<span class="selo {{ situacao }}">{{ ROTULOS.get(situacao, situacao) }}</span>{% endmacro %}
+

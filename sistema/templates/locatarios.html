@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block conteudo %}
+<h2>Locatários</h2>
+<form method="get" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nome ou CPF/CNPJ">
+  <button type="submit">Buscar</button>
+</form>
+<div class="acoes"><a role="button" href="/locatarios/novo">Novo locatário</a></div>
+<div class="overflow-auto"><table>
+  <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th class="num">Contratos ativos</th></tr></thead>
+  <tbody>
+  {% for l in locatarios %}
+  <tr><td><a href="/locatarios/{{ l.id }}">{{ l.nome }}</a></td><td>{{ l.cpf_cnpj }}</td><td>{{ l.telefone or '' }}</td>
+      <td class="num">{{ l.contratos_ativos }}</td></tr>
+  {% else %}<tr><td colspan="4">Nenhum locatário.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

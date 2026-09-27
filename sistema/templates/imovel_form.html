@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, texto, dinheiro %}
+{% block conteudo %}
+<h2>{% if editar %}Editar imóvel{% else %}Novo imóvel{% endif %}</h2>
+<form method="post">
+  {{ campo("grupo", "Grupo (prédio ou conjunto)", dados, obrigatorio=True, extra='list="grupos"', ajuda="Ex.: Anel Viário") }}
+  <datalist id="grupos">{% for g in grupos %}<option value="{{ g }}">{% endfor %}</datalist>
+  {{ campo("unidade", "Unidade", dados, obrigatorio=True, ajuda="Ex.: Apto 101") }}
+  {{ texto("endereco", "Endereço completo *", dados) }}
+  {{ dinheiro("iptu_anual", "IPTU anual", dados) }}
+  {{ campo("medidor_saneago", "Nº do medidor Saneago", dados) }}
+  {{ campo("medidor_enel", "Nº do medidor Enel", dados) }}
+  <label><input type="checkbox" name="em_manutencao" {% if dados.get('em_manutencao') in (1, True, 'on') %}checked{% endif %}> Em manutenção</label>
+  {{ texto("observacoes", "Observações", dados) }}
+  <button type="submit">Salvar</button>
+</form>
+{% endblock %}

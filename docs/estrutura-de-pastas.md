@@ -53,6 +53,7 @@ documentos/
 | Pasta do contrato começa pelo **mês de início** (`AAAA-MM`) | O histórico do imóvel fica em ordem cronológica automaticamente. |
 | Nomes fixos dentro da pasta do contrato: `contrato-assinado.pdf`, `vistoria-entrada.pdf`, `vistoria-saida.pdf`, `aditivo-AAAA-MM.pdf` | Qualquer pessoa (ou o sistema) sabe onde procurar sem abrir arquivo por arquivo. |
 | Nomes de pasta **sem acento** | Evita "Anel Viário" e "Anel Viario" virarem duas pastas diferentes para o mesmo imóvel. |
+| Comprovante de pagamento vai na pasta do contrato como `comprovante-AAAA-MM.pdf` (competência da cobrança) | Os pagamentos ficam junto do contrato a que pertencem, em ordem. |
 | Documentos do **fiador** ficam na pasta do contrato | O fiador vale apenas para aquele contrato. |
 | Arquivo sem destino claro vai para `_a-classificar/` | É melhor uma pessoa decidir depois do que o arquivo ficar no lugar errado. |
 

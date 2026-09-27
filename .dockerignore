@@ -1,0 +1,6 @@
+.git
+dados
+**/__pycache__
+**/*.db
+deploy/.env
+.streamlit
