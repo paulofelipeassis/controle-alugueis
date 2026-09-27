@@ -93,6 +93,6 @@ def test_rede_com_cliente_mcp(servidor):
                 return ferramentas, ok, erro
 
     ferramentas, ok, erro = asyncio.run(conversa())
-    assert len(ferramentas.tools) == 32
+    assert len(ferramentas.tools) == 31
     assert not ok.isError and '"imovel_id"' in ok.content[0].text
     assert erro.isError and "CPF/CNPJ inválido" in erro.content[0].text

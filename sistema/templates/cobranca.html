@@ -16,6 +16,9 @@
   {% else %}<li>Sem boleto</li>{% endif %}
 </ul>
 
+{% if c.reajuste_pendente %}
+<div class="msg aviso">Esta cobrança vence depois do aniversário do contrato e o reajuste do ano ainda não foi registrado. <a href="/contratos/{{ contrato.id }}/reajuste">Calcular reajuste →</a></div>
+{% endif %}
 {% if c.situacao == "normal" and c.saldo_centavos > 0 %}
 <div class="acoes"><a role="button" href="/pagamentos/novo?cobranca_id={{ c.id }}">Lançar pagamento</a></div>
 {% endif %}

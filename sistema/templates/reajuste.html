@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import dinheiro %}
+{% block conteudo %}
+<h2>Reajuste</h2>
+<p><a href="/contratos/{{ s.contrato_id }}">{{ s.descricao }}</a></p>
+<p>Valor atual: <strong>{{ s.valor_atual }}</strong></p>
+{% if s.erro %}
+<div class="msg aviso">{{ s.erro }}</div>
+{% else %}
+<div class="msg ok">{{ s.resumo }}.</div>
+{% endif %}
+<form method="post" action="/contratos/{{ s.contrato_id }}/reajuste">
+  {{ dinheiro("novo_valor", "Novo valor", {"novo_valor": s.valor_sugerido_centavos|reais_campo if s.valor_sugerido_centavos else ""}, obrigatorio=True) }}
+  <small>Pode trocar por um valor combinado. Para não reajustar este ano, use o valor atual.</small>
+  <label>Vale a partir de * <input type="date" name="vigente_desde" value="{{ s.vigente_desde }}" required></label>
+  <label>Motivo <input type="text" name="motivo" value="{{ s.motivo or '' }}"></label>
+  <button type="submit">Registrar reajuste</button>
+</form>
+{% endblock %}

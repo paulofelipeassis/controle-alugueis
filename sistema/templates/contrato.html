@@ -3,7 +3,6 @@
 {% block conteudo %}
 <h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
 <p><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · {{ c.locatario_telefone }}{% endif %}</p>
-{% for r in propostas %}<div class="msg aviso"><a href="/pendencias">Reajuste para aprovar: {{ r.resumo }} →</a></div>{% endfor %}
 {% if c.prazo_vencido %}<div class="msg aviso">O prazo terminou em {{ c.data_fim_prevista|data }}. O contrato continua valendo e gerando cobranças até ser renovado ou encerrado.</div>{% endif %}
 <ul>
   <li>Aluguel atual: <strong>{{ c.valor_atual }}</strong> (desde {{ c.valor_atual_desde|data }}), vence todo dia {{ c.dia_vencimento }}</li>
@@ -22,6 +21,7 @@
 <div class="acoes"><a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a></div>
 {% if c.status == "ativo" %}
 <details class="acao"><summary>Registrar reajuste</summary>
+  {% if c.indice_reajuste %}<p><a role="button" class="outline" href="/contratos/{{ c.id }}/reajuste">Calcular pelo {{ c.indice_reajuste }} (últimos 12 meses)</a></p>{% endif %}
   <form method="post" action="/contratos/{{ c.id }}/reajuste">
     {{ dinheiro("novo_valor", "Novo valor", {}, obrigatorio=True) }}
     <label>Vale a partir de * <input type="date" name="vigente_desde" required></label>

@@ -2,9 +2,6 @@
 {% from "_macros.html" import selo %}
 {% block conteudo %}
 <h2>Painel</h2>
-{% if p.reajustes_para_aprovar %}
-<div class="msg aviso"><a href="/pendencias"><strong>{{ p.reajustes_para_aprovar }} reajuste(s)</strong> para aprovar →</a></div>
-{% endif %}
 {% if p.pendencias_abertas %}
 <div class="msg aviso"><a href="/pendencias"><strong>{{ p.pendencias_abertas }} pendência(s)</strong> para conferir →</a></div>
 {% endif %}
@@ -35,7 +32,7 @@
 
 <h3>Alertas</h3>
 {% if p.alertas %}
-<ul>{% for a in p.alertas %}<li><a href="{% if a.proposta_id %}/pendencias{% elif a.cobranca_id %}/cobrancas/{{ a.cobranca_id }}{% else %}/contratos/{{ a.contrato_id }}{% endif %}">{{ a.mensagem }}</a></li>{% endfor %}</ul>
+<ul>{% for a in p.alertas %}<li><a href="{% if a.cobranca_id %}/cobrancas/{{ a.cobranca_id }}{% else %}/contratos/{{ a.contrato_id }}{% endif %}">{{ a.mensagem }}</a></li>{% endfor %}</ul>
 {% else %}<p>Nenhum alerta.</p>{% endif %}
 
 <h3>Gráficos</h3>

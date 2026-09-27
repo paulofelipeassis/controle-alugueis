@@ -143,19 +143,6 @@ def proximo_aniversario(valor_vigente_desde):
     return somar_meses(valor_vigente_desde, 12)
 
 
-def periodo_reajuste(aniversario):
-    """Os 12 meses que terminam no mês anterior ao do aniversário: (primeira, última) competência."""
-    ultimo = somar_meses(aniversario.replace(day=1), -1)
-    return competencia_de(somar_meses(ultimo, -11)), competencia_de(ultimo)
-
-
-def competencias_entre(de, ate):
-    lista = [de]
-    while lista[-1] < ate:
-        lista.append(proxima_competencia(lista[-1]))
-    return lista
-
-
 def acumulado_pct(variacoes_pct):
     """Variação acumulada (%) de uma sequência de variações mensais (%): produto de (1 + v/100)."""
     fator = Decimal(1)

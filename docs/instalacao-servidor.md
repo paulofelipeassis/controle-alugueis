@@ -12,7 +12,7 @@ O sistema tem três partes, todas na mesma imagem Docker:
 |---|---|---|
 | `web` | as páginas (login, painel, formulários) | sim, pelo Traefik, com HTTPS |
 | `mcp` | as ferramentas do Hermes | **não**, só na rede do Hermes |
-| `tarefas` | todo dia: calcula as propostas de reajuste (IPCA/IGP-M do Banco Central) e faz o backup (3h) do banco e dos documentos para o Google Drive | não |
+| `backup` | backup diário (3h) do banco e dos documentos para o Google Drive | não |
 
 ## 1. Baixar o código
 
@@ -118,7 +118,7 @@ rclone.
 
 1. No servidor:
    ```bash
-   docker compose run --rm tarefas rclone config
+   docker compose run --rm backup rclone config
    ```
    Responda: `n` (novo) → nome `drive` → tipo `drive` → deixe `client_id` e `client_secret` em
    branco → escopo `1` (acesso total) → deixe o resto no padrão → na pergunta **"Use web
@@ -130,7 +130,7 @@ rclone.
 4. No `.env`, preencha `RCLONE_DESTINO=drive:Backup Alugueis` e rode:
    ```bash
    docker compose up -d
-   docker compose exec tarefas python -m scripts.backup
+   docker compose exec backup python -m scripts.backup
    ```
 5. Confira no Google Drive a pasta "Backup Alugueis" com o arquivo `backup-alugueis-....tar.gz`.
 
@@ -150,7 +150,7 @@ cd /opt/controle-alugueis/codigo && git pull && cd deploy && docker compose up -
 ## Ver o que está acontecendo
 
 ```bash
-docker compose logs --tail 50 web      # ou mcp, ou tarefas
+docker compose logs --tail 50 web      # ou mcp, ou backup
 ```
 
 ## Domínio (quando tiver)

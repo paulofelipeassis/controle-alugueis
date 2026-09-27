@@ -41,6 +41,13 @@ parameters and call those two. Money is integer centavos, dates ISO text, status
 computed, never stored. `config.py` values are read as `config.X` at call time so tests can
 monkeypatch them.
 
+Keep the core small and optional features removable (Paulo's rule: "não criar um
+Frankenstein"). The core is cadastros → contratos → cobranças → pagamentos (+ pendências,
+auditoria). An optional feature lives in its own module that imports the core, never the
+other way round, and its docstring says how to remove it (example: `sistema/reajuste.py`).
+Don't add tables or scheduled jobs for things that can be computed on demand, and don't
+build features "just in case" — the schema is what's hard to change once real data exists.
+
 The Streamlit app described below stays in production, untouched, until stage 6.
 
 ## Running the app

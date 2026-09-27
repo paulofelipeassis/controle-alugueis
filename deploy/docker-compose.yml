@@ -33,10 +33,10 @@ services:
       hermes:
         aliases: [alugueis-mcp]
 
-  tarefas:
+  backup:
     <<: *base
-    # Todo dia: propostas de reajuste (busca IPCA/IGP-M no Banco Central) e backup.
-    command: ["python", "-m", "scripts.tarefas_diarias", "--loop"]
+    command: ["python", "-m", "scripts.backup", "--loop"]
+    # Rede comum (com internet) para enviar ao Google Drive.
     network_mode: bridge
 
 networks:

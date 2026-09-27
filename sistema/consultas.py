@@ -4,7 +4,6 @@ Cada campo `*_centavos` vem acompanhado do mesmo valor já formatado, sem o
 sufixo (ex.: `valor_centavos: 123456` e `valor: "R$ 1.234,56"`).
 """
 from datetime import timedelta
-from decimal import Decimal
 
 from sistema import db, regras, servicos
 from sistema.regras import ErroDeNegocio, maiuscula, para_data
@@ -155,6 +154,8 @@ def listar_contratos(ativos=True, hoje=None):
 # --- COBRANÇAS ---
 _SQL_COBRANCAS = (
     "SELECT cb.*, c.imovel_id, c.locatario_id, c.multa_pct, c.juros_mes_pct, c.data_encerramento, "
+    "c.indice_reajuste, (SELECT MAX(v.vigente_desde) FROM valores_aluguel v WHERE v.contrato_id = cb.contrato_id) "
+    "AS ultimo_valor_desde, "
     "i.grupo, i.unidade, l.nome AS locatario_nome, l.email AS locatario_email, "
     "l.cpf_cnpj AS locatario_cpf_cnpj, l.telefone AS locatario_telefone, "
     "COALESCE((SELECT SUM(p.valor_centavos) FROM pagamentos p WHERE p.cobranca_id = cb.id "
@@ -175,6 +176,11 @@ def _cobranca(linha, hoje):
     cobranca["situacao_texto"] = ROTULOS_SITUACAO[cobranca["situacao_calculada"]]
     cobranca["dias_atraso"] = 0
     cobranca["valor_atualizado_centavos"] = cobranca["saldo_centavos"]
+    # Vence depois do aniversário do contrato e o reajuste do ano ainda não foi registrado:
+    # o boleto não deve sair com o valor antigo.
+    cobranca["reajuste_pendente"] = bool(
+        linha["situacao"] == "normal" and saldo > 0 and linha["indice_reajuste"] and linha["ultimo_valor_desde"]
+        and venc >= regras.proximo_aniversario(para_data(linha["ultimo_valor_desde"])))
     if cobranca["situacao_calculada"] == "atrasada":
         multa, juros = regras.encargos(saldo, linha["multa_pct"], linha["juros_mes_pct"], venc, hoje)
         cobranca["dias_atraso"] = (hoje - venc).days
@@ -323,40 +329,9 @@ def extrato_contrato(contrato_id, hoje=None):
     return _com_reais(contrato)
 
 
-# --- REAJUSTES ---
-def listar_propostas_reajuste(pendentes=True, contrato_id=None):
-    condicoes = ["pr.aprovada_em IS NULL", "c.data_encerramento IS NULL"] if pendentes else []
-    params = []
-    if contrato_id:
-        condicoes.append("pr.contrato_id = ?")
-        params.append(int(contrato_id))
-    where = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
-    with db.leitura() as con:
-        linhas = _dicts(con.execute(
-            "SELECT pr.*, i.grupo, i.unidade, l.nome AS locatario_nome FROM propostas_reajuste pr "
-            "JOIN contratos c ON c.id = pr.contrato_id JOIN imoveis i ON i.id = c.imovel_id "
-            "JOIN locatarios l ON l.id = c.locatario_id "
-            f"{where} ORDER BY pr.aniversario, pr.id", tuple(params)))
-    for p in linhas:
-        p["imovel_nome"] = _imovel_nome(p)
-        p["descricao"] = f"{p['imovel_nome']} — {p['locatario_nome']}"
-        _com_reais(p)
-        periodo = f"{p['periodo_de'][5:]}/{p['periodo_de'][:4]} a {p['periodo_ate'][5:]}/{p['periodo_ate'][:4]}"
-        pct = regras.formatar_pct(p["percentual"])
-        if Decimal(p["percentual"]) <= 0:
-            p["resumo"] = (f"{p['indice']} de {periodo} = {pct}% (negativo): valor mantido em {p['valor_atual']} "
-                           f"a partir de {para_data(p['aniversario']):%d/%m/%Y}")
-        else:
-            p["resumo"] = (f"{p['indice']} de {periodo} = {pct}%: {p['valor_atual']} → {p['valor_proposto']} "
-                           f"a partir de {para_data(p['aniversario']):%d/%m/%Y}")
-    return linhas
-
-
 # --- PAINEL E ALERTAS ---
 def alertas(hoje=None):
     hoje = _hoje(hoje)
-    with db.leitura() as con:
-        propostas = {(r[0], r[1]) for r in con.execute("SELECT contrato_id, aniversario FROM propostas_reajuste")}
     lista = []
     for c in listar_contratos(ativos=True, hoje=hoje):
         fim = para_data(c["data_fim_prevista"])
@@ -368,17 +343,10 @@ def alertas(hoje=None):
                           "mensagem": f"{c['descricao']}: contrato termina em {fim:%d/%m/%Y}."})
         if c["ultimo_valor_desde"]:
             reajuste = regras.proximo_aniversario(para_data(c["ultimo_valor_desde"]))
-            if reajuste <= hoje + timedelta(days=30) and (c["id"], reajuste.isoformat()) not in propostas:
-                if regras.normalizar_indice(c["indice_reajuste"]):
-                    situacao = "o sistema calcula assim que o índice do período for publicado"
-                else:
-                    situacao = (f"índice '{c['indice_reajuste'] or 'não informado'}' não é calculado pelo sistema; "
-                                "registre o reajuste à mão")
+            if c["indice_reajuste"] and reajuste <= hoje + timedelta(days=30):
                 lista.append({"tipo": "reajuste", "contrato_id": c["id"],
-                              "mensagem": f"{c['descricao']}: reajuste anual em {reajuste:%d/%m/%Y} ({situacao})."})
-    for p in listar_propostas_reajuste():
-        lista.append({"tipo": "proposta_reajuste", "contrato_id": p["contrato_id"], "proposta_id": p["id"],
-                      "mensagem": f"{p['descricao']}: {p['resumo']}. Aguardando aprovação."})
+                              "mensagem": f"{c['descricao']}: reajuste anual ({c['indice_reajuste']}) em "
+                                          f"{reajuste:%d/%m/%Y}. Registre antes de emitir o boleto."})
     for cb in cobrancas_sem_boleto(10, hoje):
         lista.append({"tipo": "sem_boleto", "contrato_id": cb["contrato_id"], "cobranca_id": cb["id"],
                       "mensagem": f"{cb['imovel_nome']} ({cb['locatario_nome']}): cobrança de {cb['competencia']} "
@@ -409,9 +377,6 @@ def painel(hoje=None):
     lista_inadimplentes = inadimplentes(hoje)
     with db.leitura() as con:
         pendencias = con.execute("SELECT COUNT(*) FROM pendencias WHERE resolvida_em IS NULL").fetchone()[0]
-        propostas = con.execute("SELECT COUNT(*) FROM propostas_reajuste WHERE aprovada_em IS NULL "
-                                "AND contrato_id IN (SELECT id FROM contratos WHERE data_encerramento IS NULL)"
-                                ).fetchone()[0]
     return _com_reais({
         "data": hoje.isoformat(),
         "imoveis_total": len(imoveis),
@@ -424,7 +389,6 @@ def painel(hoje=None):
         "total_atrasado_centavos": sum(g["saldo_centavos"] for g in lista_inadimplentes),
         "alertas": alertas(hoje),
         "pendencias_abertas": pendencias,
-        "reajustes_para_aprovar": propostas,
     })
 
 

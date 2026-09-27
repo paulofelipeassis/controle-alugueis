@@ -1,22 +1,6 @@
 {% extends "base.html" %}
 {% block conteudo %}
 <h2>Pendências</h2>
-<h3>Reajustes para aprovar</h3>
-{% for r in propostas %}
-<article>
-  <strong><a href="/contratos/{{ r.contrato_id }}">{{ r.descricao }}</a></strong>
-  <p>{{ r.resumo }}.</p>
-  <form method="post" action="/reajustes/{{ r.id }}/aprovar">
-    <label>Valor aprovado
-      <input type="text" name="valor" inputmode="decimal" value="{{ r.valor_proposto_centavos|reais_campo }}" required>
-      <small>Pode trocar por um valor combinado com o locatário. Para não reajustar este ano, use o valor atual ({{ r.valor_atual }}).</small>
-    </label>
-    <button type="submit">Aprovar reajuste</button>
-  </form>
-</article>
-{% else %}<p><small>Nenhum reajuste esperando aprovação.</small></p>{% endfor %}
-<form method="post" action="/reajustes/verificar"><button type="submit" class="outline">Verificar reajustes agora</button></form>
-<h3>Outras pendências</h3>
 <div class="acoes">
   <a role="button" class="outline" href="/pendencias">Abertas</a>
   <a role="button" class="outline" href="/pendencias?todas=1">Todas</a>

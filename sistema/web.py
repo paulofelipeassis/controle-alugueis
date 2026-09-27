@@ -394,8 +394,7 @@ async def contrato_novo_post(request: Request):
 
 @app.get("/contratos/{contrato_id}")
 def contrato(request: Request, contrato_id: int):
-    return _pagina(request, "contrato.html", c=consultas.extrato_contrato(contrato_id),
-                   propostas=consultas.listar_propostas_reajuste(contrato_id=contrato_id))
+    return _pagina(request, "contrato.html", c=consultas.extrato_contrato(contrato_id))
 
 
 @app.get("/contratos/{contrato_id}/editar")
@@ -416,6 +415,14 @@ async def contrato_editar_post(request: Request, contrato_id: int):
                         lambda: servicos.atualizar_contrato(_quem(request), contrato_id,
                                                             **_dados_contrato_editaveis(form)),
                         lambda _: f"/contratos/{contrato_id}", "Contrato atualizado.")
+
+
+@app.get("/contratos/{contrato_id}/reajuste")
+def contrato_reajuste_calcular(request: Request, contrato_id: int):
+    """Busca o índice agora e mostra o formulário de reajuste já preenchido (módulo opcional reajuste.py)."""
+    from sistema import reajuste
+
+    return _pagina(request, "reajuste.html", s=reajuste.sugerir(contrato_id))
 
 
 @app.post("/contratos/{contrato_id}/reajuste")
@@ -581,22 +588,7 @@ async def pagamento_cancelar(request: Request, pagamento_id: int):
 @app.get("/pendencias")
 def pendencias(request: Request, todas: str = ""):
     return _pagina(request, "pendencias.html", pendencias=consultas.listar_pendencias(abertas=not todas),
-                   propostas=consultas.listar_propostas_reajuste(), todas=todas)
-
-
-@app.post("/reajustes/{proposta_id}/aprovar")
-async def reajuste_aprovar(request: Request, proposta_id: int):
-    form = await _form(request)
-    return _acao(request, "/pendencias", lambda: servicos.aprovar_reajuste(
-        _quem(request), proposta_id, _centavos(form.get("valor"), "valor aprovado")), "Reajuste aprovado.")
-
-
-@app.post("/reajustes/verificar")
-def reajustes_verificar(request: Request):
-    criadas = servicos.gerar_propostas_reajuste(_quem(request))
-    _avisar(request, f"{len(criadas)} proposta(s) de reajuste nova(s)." if criadas
-            else "Nenhuma proposta nova (sem aniversário próximo ou índice ainda não publicado).")
-    return _ir("/pendencias")
+                   todas=todas)
 
 
 @app.post("/pendencias/{pendencia_id}/resolver")

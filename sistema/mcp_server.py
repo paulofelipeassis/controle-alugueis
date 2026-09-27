@@ -106,7 +106,9 @@ def listar_cobrancas(competencia: str | None = None, situacao: str | None = None
 def cobrancas_sem_boleto(dias: int = 10) -> list:
     """Cobranças que precisam de boleto: com saldo, sem boleto, vencendo em até `dias` dias
     (ou já vencidas). Traz nome, CPF/CNPJ e e-mail do locatário, valor, vencimento, multa% e
-    juros% ao mês — tudo que é preciso para emitir o boleto no banco."""
+    juros% ao mês — tudo que é preciso para emitir o boleto no banco. Se 'reajuste_pendente'
+    for verdadeiro, NÃO emita ainda: o reajuste anual do contrato não foi registrado; use
+    sugerir_reajuste e peça a aprovação do Paulo primeiro."""
     return consultas.cobrancas_sem_boleto(dias)
 
 
@@ -213,25 +215,21 @@ def criar_contrato(imovel_id: int, locatario_id: int, data_inicio: str, data_fim
 def registrar_reajuste(contrato_id: int, novo_valor: str, vigente_desde: str, motivo: str | None = None) -> dict:
     """Registra novo valor de aluguel a partir de uma data (AAAA-MM-DD). O valor antigo fica
     no histórico. Cobranças futuras sem boleto e sem pagamento passam a ter o valor novo.
-    O cálculo do índice é seu; confirme com o Paulo antes."""
+    Use sugerir_reajuste para calcular e SÓ registre depois que o Paulo aprovar. Para não
+    reajustar naquele ano, registre o mesmo valor (motivo 'sem reajuste')."""
     servicos.registrar_reajuste(HERMES, contrato_id, _centavos(novo_valor, "novo valor"), vigente_desde, motivo)
     return {"ok": True}
 
 
 @mcp.tool()
-def listar_propostas_reajuste() -> list:
-    """Reajustes anuais calculados pelo sistema (IPCA/IGP-M dos 12 meses anteriores ao mês do
-    aniversário) esperando aprovação. Índice negativo = valor mantido. Mostre ao Paulo o
-    'resumo' de cada um e pergunte se aprova."""
-    return consultas.listar_propostas_reajuste()
+def sugerir_reajuste(contrato_id: int) -> dict:
+    """Calcula agora o reajuste anual sugerido: acumulado das últimas 12 variações publicadas do
+    IPCA ou IGP-M do contrato (Banco Central). Índice negativo = valor mantido. Não grava nada:
+    mostre o 'resumo' ao Paulo e, só depois do "sim" dele, chame registrar_reajuste com
+    novo_valor = valor_sugerido (ou o valor que ele disser), vigente_desde e motivo."""
+    from sistema import reajuste
 
-
-@mcp.tool()
-def aprovar_reajuste(proposta_id: int, valor: str | None = None) -> dict:
-    """Aprova uma proposta de reajuste. SÓ USE DEPOIS QUE O PAULO APROVAR EXPLICITAMENTE aquela
-    proposta. valor (opcional, em reais): outro valor combinado; em branco = valor proposto.
-    Se algum boleto já foi emitido com o valor antigo, a resposta traz pendência: avise o Paulo."""
-    return servicos.aprovar_reajuste(HERMES, proposta_id, _centavos(valor, "valor aprovado"))
+    return reajuste.sugerir(contrato_id)
 
 
 @mcp.tool()

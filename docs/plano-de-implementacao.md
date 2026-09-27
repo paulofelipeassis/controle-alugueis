@@ -10,10 +10,10 @@ começar qualquer etapa.**
 |---|---|
 | 1 e 2 — banco, regras, cobranças, relatórios | ✅ Feita, com testes |
 | 3 — MCP do Hermes | ✅ Feita, com testes (inclusive de rede) e `docs/hermes.md` |
-| 4 — Docker, backup e tarefas diárias | ✅ Arquivos prontos e testados num Docker local. **Falta instalar no servidor com o Paulo:** [`instalacao-servidor.md`](instalacao-servidor.md) |
+| 4 — Docker e backup | ✅ Arquivos prontos e testados num Docker local. **Falta instalar no servidor com o Paulo:** [`instalacao-servidor.md`](instalacao-servidor.md) |
 | 5 — Páginas web | ✅ Feita, com testes e verificação visual em tela de celular |
 | 6 — Virada | ⏳ Depende do Paulo (domínio, uso em paralelo, desligar o Streamlit) |
-| Extra — reajuste automático | ✅ Propostas de reajuste por IPCA/IGP-M (Banco Central) com aprovação, e data do valor atual no cadastro de contratos antigos (regras §4) |
+| Extra — reajuste | ✅ Sugestão de reajuste por IPCA/IGP-M calculada na hora (módulo `sistema/reajuste.py`), cobrança marcada até o reajuste ser registrado, e data do valor atual no cadastro de contratos antigos (regras §4) |
 
 Diferenças em relação ao plano abaixo, e por quê:
 - Tudo foi feito numa branch só, e não uma por etapa, porque o Paulo pediu para seguir até o

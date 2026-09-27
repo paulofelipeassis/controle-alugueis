@@ -26,7 +26,8 @@ para uma pessoa olhar, em vez de adivinhar.
 
 ### Todo dia: boletos
 1. `cobrancas_sem_boleto`: traz o que precisa de boleto, já com nome, CPF/CNPJ, e-mail,
-   valor, vencimento, multa e juros do contrato.
+   valor, vencimento, multa e juros do contrato. Pule as que têm `reajuste_pendente: true`
+   (veja "Reajuste anual").
 2. Emitir cada boleto no banco (hoje a Caixa), com a multa e os juros informados.
 3. `registrar_boleto` com o nosso número (`identificador`), a linha digitável e o link.
 4. Enviar o boleto por e-mail ao locatário.
@@ -68,16 +69,16 @@ novidade (atraso novo, contrato terminando, reajuste chegando, pendência nova).
   (também uma sugestão, a confirmar com o Paulo).
 
 ### Reajuste anual (IPCA e IGP-M)
-O sistema calcula sozinho, todo dia, os reajustes dos contratos com IPCA ou IGP-M e cria
-**propostas** (índice acumulado negativo = valor mantido). Sugestão:
-1. `listar_propostas_reajuste` junto com os avisos diários.
-2. Mostrar ao Paulo o `resumo` de cada proposta e perguntar se aprova, ou se o valor
-   combinado é outro.
-3. Só depois do "sim" dele: `aprovar_reajuste` (com `valor` se ele disser outro).
-4. Se a resposta trouxer pendência de boleto com valor antigo, avisar o Paulo.
+Os `alertas` avisam quando um contrato faz aniversário. Sugestão:
+1. `sugerir_reajuste` do contrato: o sistema busca na hora o acumulado das últimas 12
+   variações publicadas (índice negativo = valor mantido).
+2. Mostrar o `resumo` ao Paulo e perguntar se aprova, ou se o valor combinado é outro.
+3. Só depois do "sim" dele: `registrar_reajuste` com o valor, `vigente_desde` e `motivo`.
+4. Em `cobrancas_sem_boleto`, se uma cobrança vier com `reajuste_pendente: true`, **não emita
+   o boleto** até o reajuste ser registrado. Assim o 13º boleto já sai reajustado.
 
-### Reajuste manual, renovação e encerramento
-- `registrar_reajuste`, `renovar_contrato`, `encerrar_contrato`. Confirme com o Paulo
+### Renovação e encerramento
+- `renovar_contrato`, `encerrar_contrato`. Confirme com o Paulo
   antes: são decisões dele. Você só executa.
 - Ao encerrar, se a resposta trouxer pendências de "cancelar boleto", cancele o boleto no
   banco e avise o Paulo.
