@@ -1,11 +1,6 @@
 import streamlit as st
-import gspread
-import pandas as pd
-import streamlit_authenticator as stauth
-import re
-from datetime import datetime
-from copy import deepcopy
 from auth_utils import page_guard
+from data_access import load_data_fresh, update_row
 
 page_guard()
 
@@ -16,28 +11,7 @@ st.title("🏡 Editar Imóvel")
 st.markdown("---")
 
 
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-
-sh = get_connection()
-imoveis_ws = sh.worksheet("Imoveis")
-
-
-# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS ---
-@st.cache_data(ttl=30)
-def load_imoveis():
-    data = imoveis_ws.get_all_values()
-    if len(data) < 2: return pd.DataFrame()
-    headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
-    return df
-
-
-df_imoveis = load_imoveis()
+df_imoveis = load_data_fresh("Imoveis")
 
 # --- PASSO 1: SELECIONAR O IMÓVEL PARA EDITAR ---
 st.subheader("Passo 1: Selecione o Imóvel que Deseja Editar")
@@ -86,12 +60,13 @@ if not df_imoveis.empty:
 
             if submitted:
                 with st.spinner("Salvando..."):
-                    cell = imoveis_ws.find(id_imovel_selecionado)
                     novos_valores = [dados_imovel['ID_Imovel'], grupo, unidade, endereco, status, iptu_anual,
                                      medidor_agua, medidor_energia]
-                    imoveis_ws.update(f'A{cell.row}:H{cell.row}', [novos_valores])
-                    st.cache_data.clear()
-                    st.success("Imóvel atualizado com sucesso!")
-                    st.balloons()
+                    try:
+                        update_row("Imoveis", id_imovel_selecionado, novos_valores)
+                        st.success("Imóvel atualizado com sucesso!")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Ocorreu um erro ao salvar o imóvel: {e}")
 else:
     st.warning("Nenhum dado de imóvel encontrado na planilha.")

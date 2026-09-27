@@ -1,12 +1,8 @@
 import streamlit as st
-import gspread
-import pandas as pd
 from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-import streamlit_authenticator as stauth
-import re
-from copy import deepcopy
+import pandas as pd
 from auth_utils import page_guard
+from data_access import load_data, cancelar_lancamento as _cancelar_lancamento
 
 page_guard()
 
@@ -16,41 +12,10 @@ st.set_page_config(page_title="Histórico Financeiro", page_icon="📈", layout=
 st.title("📈 Histórico Financeiro")
 st.markdown("---")
 
-# --- CONEXÃO COM A PLANILHA (USANDO SECRETS) ---
-@st.cache_resource
-def get_connection():
-    gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-    return gc.open("Controle de Aluguéis")
-
-sh = get_connection()
-financeiro_ws = sh.worksheet("Lancamentos_Financeiros")
-
-# --- FUNÇÃO DE CACHE PARA CARREGAR DADOS ---
-@st.cache_data(ttl=600)
-def load_data(worksheet_name):
-    worksheet = sh.worksheet(worksheet_name)
-    data = worksheet.get_all_values()
-    if not data or len(data) < 2:
-        return pd.DataFrame()
-    headers = data[0]
-    df = pd.DataFrame(data[1:], columns=headers)
-    # Padroniza os tipos de dados
-    if 'Valor_Total_Pago' in df.columns:
-        df['Valor_Total_Pago'] = pd.to_numeric(df['Valor_Total_Pago'], errors='coerce').fillna(0)
-    if 'Data_Pagamento' in df.columns:
-        df['Data_Pagamento'] = pd.to_datetime(df['Data_Pagamento'], errors='coerce')
-    if 'ID_Contrato' in df.columns:
-        df['ID_Contrato'] = df['ID_Contrato'].astype(str)
-    if 'ID_Imovel' in df.columns:
-        df['ID_Imovel'] = df['ID_Imovel'].astype(str)
-    return df
-
 # --- LÓGICA DE CANCELAMENTO ---
 def cancelar_lancamento(id_lancamento):
     try:
-        cell = financeiro_ws.find(str(id_lancamento))
-        financeiro_ws.update_cell(cell.row, 10, "Cancelado")
-        st.cache_data.clear()
+        _cancelar_lancamento(id_lancamento)
         st.success(f"Lançamento {id_lancamento} cancelado com sucesso!")
         st.rerun()
     except Exception as e:

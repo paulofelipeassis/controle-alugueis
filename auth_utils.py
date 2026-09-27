@@ -2,6 +2,8 @@
 import streamlit as st
 import streamlit_authenticator as stauth
 
+from data_access import logger
+
 
 def page_guard():
     """
@@ -36,9 +38,11 @@ def page_guard():
         authenticator.logout(location='sidebar')
 
     except KeyError:
+        logger.exception("Secrets de autenticação ausentes ou incompletos")
         st.error(
             "A configuração de autenticação (Secrets) não foi encontrada ou está incompleta. Por favor, faça login novamente.")
         st.stop()
     except Exception as e:
+        logger.exception("Erro inesperado durante a autenticação")
         st.error(f"Ocorreu um erro inesperado durante a autenticação: {e}")
         st.stop()
