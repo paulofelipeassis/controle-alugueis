@@ -1,6 +1,10 @@
+from datetime import date
+
 import pytest
 
-from sistema import config, servicos
+from sistema import config, regras, servicos
+
+HOJE = date(2026, 9, 27)
 
 
 @pytest.fixture(autouse=True)
@@ -9,6 +13,8 @@ def banco_temporario(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "teste.db"))
     monkeypatch.setattr(config, "DOCS_DIR", str(tmp_path / "documentos"))
     monkeypatch.setattr(config, "INICIO_COBRANCAS", "2026-10")
+    # Data fixa: os testes não podem mudar de resultado com a passagem do tempo.
+    monkeypatch.setattr(regras, "hoje", lambda: HOJE)
     return tmp_path
 
 

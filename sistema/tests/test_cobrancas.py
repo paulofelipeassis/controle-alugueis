@@ -35,7 +35,8 @@ def test_vencimento_dia_31():
 def test_nada_antes_do_inicio_das_cobrancas():
     imovel = servicos.cadastrar_imovel("t", "G", "U", "E")
     loc = servicos.cadastrar_locatario("t", "N", "12345678900", "n@x.com")
-    contrato = servicos.criar_contrato("t", imovel, loc, "2025-03-01", "2027-03-01", 5, 100000)
+    contrato = servicos.criar_contrato("t", imovel, loc, "2025-03-01", "2027-03-01", 5, 100000,
+                                       valor_vigente_desde="2026-03-01")
     servicos.gerar_cobrancas("t", "2026-10-01")
     assert [c["competencia"] for c in _cobrancas(contrato)] == ["2026-10"]
 

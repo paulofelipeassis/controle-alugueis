@@ -140,3 +140,29 @@ CREATE TABLE IF NOT EXISTS auditoria (
   entidade_id INTEGER,
   detalhes TEXT                           -- JSON
 );
+
+-- Variações mensais dos índices (cópia local do que foi buscado no Banco Central).
+CREATE TABLE IF NOT EXISTS indices (
+  indice TEXT NOT NULL,                   -- 'IPCA' ou 'IGP-M'
+  competencia TEXT NOT NULL,              -- 'AAAA-MM'
+  variacao_pct TEXT NOT NULL,             -- ex.: '0.42' (texto para não perder precisão)
+  PRIMARY KEY (indice, competencia)
+);
+
+-- Reajuste anual calculado pelo sistema, esperando aprovação de uma pessoa.
+CREATE TABLE IF NOT EXISTS propostas_reajuste (
+  id INTEGER PRIMARY KEY,
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  aniversario TEXT NOT NULL,              -- data em que o novo valor passa a valer
+  indice TEXT NOT NULL,
+  periodo_de TEXT NOT NULL,               -- 'AAAA-MM'
+  periodo_ate TEXT NOT NULL,
+  percentual TEXT NOT NULL,               -- acumulado em 12 meses, ex.: '4.12'
+  valor_atual_centavos INTEGER NOT NULL,
+  valor_proposto_centavos INTEGER NOT NULL,
+  criada_em TEXT NOT NULL,
+  aprovada_em TEXT,
+  aprovada_por TEXT,
+  valor_aprovado_centavos INTEGER,
+  UNIQUE (contrato_id, aniversario)
+);

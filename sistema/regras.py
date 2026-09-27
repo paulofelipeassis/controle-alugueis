@@ -112,6 +112,11 @@ def formatar_reais(centavos):
     return f"{sinal}R$ {reais:,}".replace(",", ".") + f",{cent:02d}"
 
 
+def formatar_pct(valor):
+    """'4.12' → '4,12'; '-2.10' → '-2,10'."""
+    return f"{Decimal(str(valor)):.2f}".replace(".", ",")
+
+
 def encargos(valor, multa_pct, juros_mes_pct, vencimento_, data):
     """(multa, juros) em centavos para pagamento em `data`. Juros pró-rata: juros% × dias ÷ 30."""
     if valor <= 0 or data <= vencimento_:
@@ -121,6 +126,51 @@ def encargos(valor, multa_pct, juros_mes_pct, vencimento_, data):
     juros = Decimal(valor) * Decimal(str(juros_mes_pct)) / 100 * dias / 30
     arred = lambda d: int(d.quantize(Decimal("1"), rounding=ROUND_HALF_UP))  # noqa: E731
     return arred(multa), arred(juros)
+
+
+# --- REAJUSTE ANUAL ---
+INDICES = ("IPCA", "IGP-M")
+
+
+def normalizar_indice(texto):
+    """'igpm', 'IGP-M', 'Igp m' → 'IGP-M'; 'ipca' → 'IPCA'; outro → None."""
+    chave = re.sub(r"[^A-Z]", "", str(texto or "").upper())
+    return {"IPCA": "IPCA", "IGPM": "IGP-M"}.get(chave)
+
+
+def proximo_aniversario(valor_vigente_desde):
+    """Reajuste só pode ser anual (Lei 10.192/2001, art. 2º §1º): 12 meses depois do último valor."""
+    return somar_meses(valor_vigente_desde, 12)
+
+
+def periodo_reajuste(aniversario):
+    """Os 12 meses que terminam no mês anterior ao do aniversário: (primeira, última) competência."""
+    ultimo = somar_meses(aniversario.replace(day=1), -1)
+    return competencia_de(somar_meses(ultimo, -11)), competencia_de(ultimo)
+
+
+def competencias_entre(de, ate):
+    lista = [de]
+    while lista[-1] < ate:
+        lista.append(proxima_competencia(lista[-1]))
+    return lista
+
+
+def acumulado_pct(variacoes_pct):
+    """Variação acumulada (%) de uma sequência de variações mensais (%): produto de (1 + v/100)."""
+    fator = Decimal(1)
+    for v in variacoes_pct:
+        fator *= 1 + Decimal(str(v)) / 100
+    return ((fator - 1) * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def valor_reajustado(valor, percentual):
+    """Índice negativo ou zero mantém o valor (decisão do Paulo)."""
+    percentual = Decimal(str(percentual))
+    if percentual <= 0:
+        return valor
+    novo = Decimal(valor) * (1 + percentual / 100)
+    return int(novo.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 # --- SITUAÇÕES (calculadas, nunca digitadas) ---

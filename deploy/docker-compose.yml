@@ -33,9 +33,10 @@ services:
       hermes:
         aliases: [alugueis-mcp]
 
-  backup:
+  tarefas:
     <<: *base
-    command: ["python", "-m", "scripts.backup", "--loop"]
+    # Todo dia: propostas de reajuste (busca IPCA/IGP-M no Banco Central) e backup.
+    command: ["python", "-m", "scripts.tarefas_diarias", "--loop"]
     network_mode: bridge
 
 networks:

@@ -27,6 +27,8 @@
     {{ dinheiro("valor_aluguel", "Valor do aluguel", dados, obrigatorio=True) }}
     {{ campo("dia_vencimento", "Dia do vencimento", dados, tipo="number", obrigatorio=True, extra='min="1" max="31"') }}
   </div>
+  {{ campo("valor_vigente_desde", "O valor atual vale desde (data do último reajuste)", dados, tipo="date",
+           ajuda="Só para contrato que começou há mais de 1 ano. Em branco: vale desde o início. O próximo reajuste é calculado a partir desta data.") }}
   {% endif %}
   <label>Corretor
     <select name="corretor_id">

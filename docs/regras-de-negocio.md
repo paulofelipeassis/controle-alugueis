@@ -91,9 +91,28 @@ Regras:
   indeterminado (Lei 8.245/1991, arts. 46 §1º, 47 e 56, parágrafo único).
 - **Renovar** = mudar a data de fim prevista do **mesmo** contrato (e, se houver, registrar
   novo valor). Não se cria contrato novo para renovação.
-- **Reajuste** = novo valor com data "vigente desde". Alerta quando faz 12 meses do último
-  valor. A lei proíbe reajuste com periodicidade menor que 1 ano (Lei 10.192/2001, art. 2º
-  §1º). O cálculo do índice fica com a pessoa ou com o Hermes; o sistema só guarda o valor.
+- **Reajuste anual automático, com aprovação de uma pessoa** (decisão do Paulo, 27/09/2026):
+  - O próximo reajuste é **12 meses depois do último valor** (a lei proíbe periodicidade menor
+    que 1 ano: Lei 10.192/2001, art. 2º §1º).
+  - Para contratos com índice **IPCA** ou **IGP-M**, o sistema busca todo dia as variações
+    mensais na API pública do Banco Central (séries 433 e 189). Até 30 dias antes do
+    aniversário, ele calcula o acumulado e cria uma **proposta de reajuste**.
+  - Período: os **12 meses que terminam no mês anterior ao do aniversário** (aniversário em
+    outubro → outubro do ano anterior a setembro). Se o último mês ainda não foi publicado
+    (o IPCA sai por volta do dia 10 do mês seguinte), a proposta sai assim que for.
+  - **Índice acumulado negativo ou zero: o valor se mantém.**
+  - **Nada muda sem aprovação.** Uma pessoa aprova na web, ou pelo Hermes depois de o Paulo
+    confirmar. Na aprovação dá para trocar o valor por um combinado (inclusive o mesmo valor,
+    para não reajustar naquele ano). Aprovado: o novo valor vale a partir do aniversário e as
+    cobranças sem boleto são atualizadas. Se algum boleto já tinha sido emitido com o valor
+    antigo, vira pendência (segunda via ou cobrar a diferença).
+  - Outro índice (ex.: INPC) ou Banco Central fora do ar: fica o alerta, e a pessoa registra o
+    reajuste à mão.
+- **Contrato que já existia antes do sistema:** é cadastrado com a **data de início
+  verdadeira** e o **valor atual**, mais a **data desde quando vale o valor atual** (data do
+  último reajuste). Esta última é obrigatória se o contrato começou há mais de 1 ano, porque é
+  dela que sai o próximo reajuste. Não são geradas cobranças de meses anteriores a
+  `INICIO_COBRANCAS`, então não aparecem dívidas antigas.
 - **Encerrar** = informar data e motivo. As cobranças com vencimento depois do encerramento
   e sem pagamento são canceladas. Se alguma já tinha boleto emitido, o sistema cria uma
   **pendência** "cancelar boleto no banco". Dívidas anteriores continuam em aberto.
@@ -196,7 +215,8 @@ Os mesmos para a web e para o Hermes:
   recebido, falta receber); cobranças atrasadas (**de qualquer mês**, não só do atual, outro
   erro da versão atual); alertas; pendências abertas.
 - **Alertas:** contratos com fim previsto nos próximos 60 dias; contratos com prazo vencido
-  (renovar ou encerrar); reajustes devidos nos próximos 30 dias ou já vencidos; cobranças
+  (renovar ou encerrar); reajustes devidos nos próximos 30 dias ou já vencidos, e propostas de
+  reajuste esperando aprovação; cobranças
   que vencem em até 10 dias sem boleto; boletos emitidos e não enviados.
 - **Inadimplentes:** por locatário/contrato, total em atraso e valor atualizado.
 - **Extrato do contrato:** todas as cobranças com valor, pagamentos, saldo, situação e boleto.
@@ -211,7 +231,8 @@ Os mesmos para a web e para o Hermes:
 - O Hermes **nunca** acessa o banco diretamente. Ele usa um **servidor MCP** do sistema, com
   ferramentas **estreitas** (cada uma faz uma coisa só, com regras aplicadas pelo sistema).
 - O que o Hermes **pode**: consultar tudo; cadastrar imóvel, locatário, corretor e contrato;
-  registrar reajuste, renovação e encerramento; registrar boleto e envio; registrar
+  registrar reajuste, renovação e encerramento; aprovar proposta de reajuste (só depois de o
+  Paulo confirmar); registrar boleto e envio; registrar
   pagamento; anexar documento; criar pendência.
 - O que o Hermes **não pode** (só pessoas, pela web): cancelar pagamento, isentar ou
   cancelar cobrança, editar valor de cobrança, resolver pendência, apagar qualquer coisa,

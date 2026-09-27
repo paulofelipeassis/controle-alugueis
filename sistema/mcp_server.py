@@ -192,15 +192,21 @@ def criar_contrato(imovel_id: int, locatario_id: int, data_inicio: str, data_fim
                    dia_vencimento: int, valor_aluguel: str, corretor_id: int | None = None,
                    multa_pct: float = 2, juros_mes_pct: float = 1, garantia_tipo: str = "nenhuma",
                    garantia_valor: str | None = None, fiador: str | None = None,
-                   indice_reajuste: str | None = None, observacoes: str | None = None) -> dict:
+                   indice_reajuste: str | None = None, observacoes: str | None = None,
+                   valor_vigente_desde: str | None = None) -> dict:
     """Cria um contrato ligando imóvel e locatário. Datas AAAA-MM-DD; valor_aluguel em reais
-    ('1.500,00'); dia_vencimento 1 a 31. garantia_tipo: 'caucao', 'fiador', 'seguro_fianca'
-    ou 'nenhuma'. indice_reajuste: ex. 'IGP-M' ou 'IPCA'. O imóvel não pode ter outro
-    contrato ativo. As cobranças são geradas automaticamente."""
+    ('1.500,00') = valor ATUAL do aluguel; dia_vencimento 1 a 31. garantia_tipo: 'caucao',
+    'fiador', 'seguro_fianca' ou 'nenhuma'. indice_reajuste: 'IGP-M' ou 'IPCA' (o sistema
+    calcula o reajuste anual desses dois). O imóvel não pode ter outro contrato ativo.
+    CONTRATO QUE JÁ EXISTIA: use a data_inicio verdadeira e informe valor_vigente_desde = data
+    do último reajuste (desde quando vale o valor atual) — obrigatório se começou há mais de 1
+    ano; o próximo reajuste é calculado a partir dela. Não são geradas cobranças de meses
+    anteriores ao início das cobranças no sistema, então não surgem dívidas antigas."""
     return {"contrato_id": servicos.criar_contrato(
         HERMES, imovel_id, locatario_id, data_inicio, data_fim_prevista, dia_vencimento,
         _centavos(valor_aluguel, "valor do aluguel"), corretor_id, multa_pct, juros_mes_pct, garantia_tipo,
-        _centavos(garantia_valor, "valor da garantia"), fiador, indice_reajuste, observacoes)}
+        _centavos(garantia_valor, "valor da garantia"), fiador, indice_reajuste, observacoes,
+        valor_vigente_desde)}
 
 
 @mcp.tool()
@@ -210,6 +216,22 @@ def registrar_reajuste(contrato_id: int, novo_valor: str, vigente_desde: str, mo
     O cálculo do índice é seu; confirme com o Paulo antes."""
     servicos.registrar_reajuste(HERMES, contrato_id, _centavos(novo_valor, "novo valor"), vigente_desde, motivo)
     return {"ok": True}
+
+
+@mcp.tool()
+def listar_propostas_reajuste() -> list:
+    """Reajustes anuais calculados pelo sistema (IPCA/IGP-M dos 12 meses anteriores ao mês do
+    aniversário) esperando aprovação. Índice negativo = valor mantido. Mostre ao Paulo o
+    'resumo' de cada um e pergunte se aprova."""
+    return consultas.listar_propostas_reajuste()
+
+
+@mcp.tool()
+def aprovar_reajuste(proposta_id: int, valor: str | None = None) -> dict:
+    """Aprova uma proposta de reajuste. SÓ USE DEPOIS QUE O PAULO APROVAR EXPLICITAMENTE aquela
+    proposta. valor (opcional, em reais): outro valor combinado; em branco = valor proposto.
+    Se algum boleto já foi emitido com o valor antigo, a resposta traz pendência: avise o Paulo."""
+    return servicos.aprovar_reajuste(HERMES, proposta_id, _centavos(valor, "valor aprovado"))
 
 
 @mcp.tool()

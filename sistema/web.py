@@ -385,7 +385,8 @@ async def contrato_novo_post(request: Request):
         return servicos.criar_contrato(
             _quem(request), int(form["imovel_id"]), int(form["locatario_id"]), form.get("data_inicio"),
             form.get("data_fim_prevista"), int(form.get("dia_vencimento") or 0),
-            _centavos(form.get("valor_aluguel"), "valor do aluguel"), **_dados_contrato_editaveis(form))
+            _centavos(form.get("valor_aluguel"), "valor do aluguel"),
+            valor_vigente_desde=form.get("valor_vigente_desde") or None, **_dados_contrato_editaveis(form))
 
     return _salvar_form(request, "contrato_form.html", {"dados": form, **_opcoes_contrato()}, criar,
                         lambda id_: f"/contratos/{id_}", "Contrato criado. As cobranças foram geradas.")
@@ -393,7 +394,8 @@ async def contrato_novo_post(request: Request):
 
 @app.get("/contratos/{contrato_id}")
 def contrato(request: Request, contrato_id: int):
-    return _pagina(request, "contrato.html", c=consultas.extrato_contrato(contrato_id))
+    return _pagina(request, "contrato.html", c=consultas.extrato_contrato(contrato_id),
+                   propostas=consultas.listar_propostas_reajuste(contrato_id=contrato_id))
 
 
 @app.get("/contratos/{contrato_id}/editar")
@@ -579,7 +581,22 @@ async def pagamento_cancelar(request: Request, pagamento_id: int):
 @app.get("/pendencias")
 def pendencias(request: Request, todas: str = ""):
     return _pagina(request, "pendencias.html", pendencias=consultas.listar_pendencias(abertas=not todas),
-                   todas=todas)
+                   propostas=consultas.listar_propostas_reajuste(), todas=todas)
+
+
+@app.post("/reajustes/{proposta_id}/aprovar")
+async def reajuste_aprovar(request: Request, proposta_id: int):
+    form = await _form(request)
+    return _acao(request, "/pendencias", lambda: servicos.aprovar_reajuste(
+        _quem(request), proposta_id, _centavos(form.get("valor"), "valor aprovado")), "Reajuste aprovado.")
+
+
+@app.post("/reajustes/verificar")
+def reajustes_verificar(request: Request):
+    criadas = servicos.gerar_propostas_reajuste(_quem(request))
+    _avisar(request, f"{len(criadas)} proposta(s) de reajuste nova(s)." if criadas
+            else "Nenhuma proposta nova (sem aniversário próximo ou índice ainda não publicado).")
+    return _ir("/pendencias")
 
 
 @app.post("/pendencias/{pendencia_id}/resolver")

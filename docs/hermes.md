@@ -58,11 +58,25 @@ novidade (atraso novo, contrato terminando, reajuste chegando, pendência nova).
 - Antes de cadastrar um locatário, `buscar_locatarios` para não duplicar.
 - Ordem: `cadastrar_imovel` → `cadastrar_locatario` → `criar_contrato`. As cobranças são
   criadas sozinhas.
+- **Contratos que já existem:** use a data de início verdadeira, o valor **atual** do aluguel e
+  `valor_vigente_desde` = data do último reajuste (desde quando vale o valor atual). Isso é
+  obrigatório se o contrato começou há mais de 1 ano. Se não souber a data, pergunte ao Paulo:
+  é dela que o sistema calcula o próximo reajuste. O sistema não cria cobranças de meses
+  anteriores ao início das cobranças, então não aparecem dívidas antigas.
 - Documentos (contrato assinado, vistorias, RG): salvar na pasta de `pasta_documento` e
   chamar `registrar_documento`. A convenção de pastas está em `docs/estrutura-de-pastas.md`
   (também uma sugestão, a confirmar com o Paulo).
 
-### Reajuste, renovação e encerramento
+### Reajuste anual (IPCA e IGP-M)
+O sistema calcula sozinho, todo dia, os reajustes dos contratos com IPCA ou IGP-M e cria
+**propostas** (índice acumulado negativo = valor mantido). Sugestão:
+1. `listar_propostas_reajuste` junto com os avisos diários.
+2. Mostrar ao Paulo o `resumo` de cada proposta e perguntar se aprova, ou se o valor
+   combinado é outro.
+3. Só depois do "sim" dele: `aprovar_reajuste` (com `valor` se ele disser outro).
+4. Se a resposta trouxer pendência de boleto com valor antigo, avisar o Paulo.
+
+### Reajuste manual, renovação e encerramento
 - `registrar_reajuste`, `renovar_contrato`, `encerrar_contrato`. Confirme com o Paulo
   antes: são decisões dele. Você só executa.
 - Ao encerrar, se a resposta trouxer pendências de "cancelar boleto", cancele o boleto no

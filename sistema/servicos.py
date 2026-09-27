@@ -7,8 +7,10 @@ A web e o MCP (Hermes) chamam estas mesmas funções. Regras:
 - dinheiro sempre em centavos (inteiro).
 """
 import json
+import logging
 import sqlite3
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path, PurePosixPath
 
 import bcrypt
@@ -22,6 +24,7 @@ ENTIDADES_DOCUMENTO = ("imovel", "locatario", "contrato")
 # Documentos com nome de arquivo fixo dentro da pasta (ver docs/estrutura-de-pastas.md).
 NOMES_FIXOS = ("contrato-assinado", "vistoria-entrada", "vistoria-saida")
 TOLERANCIA_CENTAVOS = 100  # diferença até R$ 1,00 não vira pendência
+logger = logging.getLogger("controle_alugueis")
 
 
 # --- AUXILIARES ---
@@ -304,7 +307,10 @@ def _campos_contrato_editaveis(dados):
 
 def criar_contrato(quem, imovel_id, locatario_id, data_inicio, data_fim_prevista, dia_vencimento,
                    valor_centavos, corretor_id=None, multa_pct=2, juros_mes_pct=1, garantia_tipo="nenhuma",
-                   garantia_valor_centavos=None, fiador=None, indice_reajuste=None, observacoes=None):
+                   garantia_valor_centavos=None, fiador=None, indice_reajuste=None, observacoes=None,
+                   valor_vigente_desde=None):
+    """valor_vigente_desde: para contrato que já existia, desde quando vale o valor atual (data do
+    último reajuste). Obrigatório se o contrato começou há mais de 1 ano. Define o próximo reajuste."""
     inicio = para_data(data_inicio, "data de início")
     fim = para_data(data_fim_prevista, "data de fim prevista")
     if fim <= inicio:
@@ -313,6 +319,17 @@ def criar_contrato(quem, imovel_id, locatario_id, data_inicio, data_fim_prevista
     if not 1 <= dia <= 31:
         raise ErroDeNegocio("O dia de vencimento precisa estar entre 1 e 31.")
     valor = _valor_positivo(valor_centavos, "valor do aluguel")
+    if valor_vigente_desde:
+        vigente = para_data(valor_vigente_desde, "data do valor atual")
+        if not inicio <= vigente <= regras.hoje():
+            raise ErroDeNegocio("A data do valor atual precisa estar entre o início do contrato e hoje.")
+    elif regras.somar_meses(inicio, 12) <= regras.hoje():
+        raise ErroDeNegocio(
+            "Esse contrato começou há mais de 1 ano. Informe desde quando vale o valor atual do aluguel "
+            "(data do último reajuste), para o sistema calcular o próximo reajuste."
+        )
+    else:
+        vigente = inicio
     extras = _campos_contrato_editaveis(dict(
         corretor_id=corretor_id, multa_pct=multa_pct, juros_mes_pct=juros_mes_pct, garantia_tipo=garantia_tipo,
         garantia_valor_centavos=garantia_valor_centavos, fiador=fiador, indice_reajuste=indice_reajuste,
@@ -340,7 +357,7 @@ def criar_contrato(quem, imovel_id, locatario_id, data_inicio, data_fim_prevista
         contrato_id = cur.lastrowid
         con.execute(
             "INSERT INTO valores_aluguel (contrato_id, valor_centavos, vigente_desde, motivo) VALUES (?, ?, ?, ?)",
-            (contrato_id, valor, inicio.isoformat(), "inicial"),
+            (contrato_id, valor, vigente.isoformat(), "inicial" if vigente == inicio else "valor atual no cadastro"),
         )
         _auditar(con, quem, "criar_contrato", "contrato", contrato_id, valor_centavos=valor, **campos)
     gerar_cobrancas("sistema")
@@ -466,10 +483,13 @@ def apagar_contrato(quem, contrato_id):
 
 # --- COBRANÇAS ---
 def _valor_vigente(con, contrato_id, data_iso):
+    """Valor que vale na data. Antes do primeiro registro (contrato antigo cadastrado com o valor
+    atual), usa o mais antigo conhecido."""
     linha = con.execute(
-        "SELECT valor_centavos FROM valores_aluguel WHERE contrato_id = ? AND vigente_desde <= ? "
-        "ORDER BY vigente_desde DESC LIMIT 1",
-        (contrato_id, data_iso),
+        "SELECT valor_centavos FROM valores_aluguel WHERE contrato_id = ? "
+        "ORDER BY vigente_desde <= ? DESC, CASE WHEN vigente_desde <= ? THEN vigente_desde END DESC, "
+        "vigente_desde LIMIT 1",
+        (contrato_id, data_iso, data_iso),
     ).fetchone()
     return linha[0] if linha else None
 
@@ -549,6 +569,88 @@ def isentar_cobranca(quem, cobranca_id, motivo):
 
 def cancelar_cobranca(quem, cobranca_id, motivo):
     return _mudar_situacao(quem, cobranca_id, "cancelada", motivo)
+
+
+# --- REAJUSTE ANUAL AUTOMÁTICO (proposta + aprovação de uma pessoa) ---
+def gerar_propostas_reajuste(quem="sistema", hoje=None, buscar=None):
+    """Para contratos ativos com aniversário em até 30 dias (ou já passado), busca o índice e cria a
+    proposta de reajuste. Não muda nenhum valor: uma pessoa aprova. Rodar de novo não duplica."""
+    from sistema import indices  # import aqui: só esta função fala com a internet
+
+    hoje = para_data(hoje) if hoje else regras.hoje()
+    with db.leitura() as con:
+        candidatos = con.execute(
+            "SELECT c.id, c.indice_reajuste, v.valor_centavos, v.vigente_desde FROM contratos c "
+            "JOIN valores_aluguel v ON v.contrato_id = c.id AND v.vigente_desde = ("
+            "  SELECT MAX(vigente_desde) FROM valores_aluguel WHERE contrato_id = c.id) "
+            "WHERE c.data_encerramento IS NULL"
+        ).fetchall()
+        existentes = {(r[0], r[1]) for r in con.execute("SELECT contrato_id, aniversario FROM propostas_reajuste")}
+    criadas = []
+    for c in candidatos:
+        aniversario = regras.proximo_aniversario(para_data(c["vigente_desde"]))
+        indice = regras.normalizar_indice(c["indice_reajuste"])
+        if aniversario > hoje + timedelta(days=30) or not indice or (c["id"], aniversario.isoformat()) in existentes:
+            continue
+        de, ate = regras.periodo_reajuste(aniversario)
+        try:
+            mensais = indices.variacoes(indice, de, ate, **({"buscar": buscar} if buscar else {}))
+        except Exception as erro:  # noqa: BLE001 — Banco Central fora do ar: tenta de novo amanhã
+            logger.warning("Não foi possível buscar o %s: %s", indice, erro)
+            continue
+        if mensais is None:  # último mês ainda não publicado
+            continue
+        percentual = regras.acumulado_pct(mensais)
+        proposto = regras.valor_reajustado(c["valor_centavos"], percentual)
+        with db.transacao() as con:
+            cur = con.execute(
+                "INSERT OR IGNORE INTO propostas_reajuste (contrato_id, aniversario, indice, periodo_de, periodo_ate, "
+                "percentual, valor_atual_centavos, valor_proposto_centavos, criada_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (c["id"], aniversario.isoformat(), indice, de, ate, str(percentual), c["valor_centavos"], proposto,
+                 regras.agora()),
+            )
+            if cur.rowcount:
+                _auditar(con, quem, "propor_reajuste", "contrato", c["id"], proposta_id=cur.lastrowid,
+                         indice=indice, percentual=str(percentual), valor_proposto_centavos=proposto)
+                criadas.append(cur.lastrowid)
+    return criadas
+
+
+def aprovar_reajuste(quem, proposta_id, valor_centavos=None):
+    """Aprova a proposta: registra o novo valor a partir do aniversário. valor_centavos permite
+    aprovar outro valor combinado (ex.: o mesmo valor, para não reajustar este ano)."""
+    with db.transacao() as con:
+        proposta = _obter(con, "propostas_reajuste", proposta_id, "Proposta de reajuste")
+        if proposta["aprovada_em"]:
+            raise ErroDeNegocio("Essa proposta de reajuste já foi aprovada.")
+        _contrato_ativo(con, proposta["contrato_id"])
+        valor = _valor_positivo(valor_centavos if valor_centavos else proposta["valor_proposto_centavos"])
+        pct = regras.formatar_pct(proposta["percentual"])
+        motivo = (f"{proposta['indice']} {pct}% ({proposta['periodo_de']} a {proposta['periodo_ate']})"
+                  + (" — índice negativo, valor mantido" if Decimal(proposta["percentual"]) <= 0 else "")
+                  + (" — valor combinado" if valor != proposta["valor_proposto_centavos"] else ""))
+        _registrar_reajuste(con, quem, proposta["contrato_id"], valor, proposta["aniversario"], motivo)
+        con.execute("UPDATE propostas_reajuste SET aprovada_em = ?, aprovada_por = ?, valor_aprovado_centavos = ? "
+                    "WHERE id = ?", (regras.agora(), quem, valor, proposta_id))
+        _auditar(con, quem, "aprovar_reajuste", "contrato", proposta["contrato_id"], proposta_id=proposta_id,
+                 valor_centavos=valor)
+        # Boleto já emitido com o valor antigo: uma pessoa decide (segunda via ou cobrar a diferença).
+        pendencias = []
+        for cobranca in con.execute(
+            "SELECT * FROM cobrancas c WHERE contrato_id = ? AND situacao = 'normal' AND vencimento >= ? "
+            "AND boleto_identificador IS NOT NULL AND valor_centavos <> ? AND NOT EXISTS ("
+            "  SELECT 1 FROM pagamentos p WHERE p.cobranca_id = c.id AND p.cancelado_em IS NULL)",
+            (proposta["contrato_id"], proposta["aniversario"], valor),
+        ).fetchall():
+            pendencias.append(_nova_pendencia(
+                con, quem, "boleto_valor_antigo",
+                f"O boleto {cobranca['boleto_identificador']} ({_rotulo_cobranca(con, cobranca)}) foi emitido com "
+                f"{regras.formatar_reais(cobranca['valor_centavos'])}, mas o reajuste aprovado é "
+                f"{regras.formatar_reais(valor)}. Emitir segunda via ou cobrar a diferença depois.",
+                "cobranca", cobranca["id"],
+            ))
+    gerar_cobrancas("sistema")
+    return {"valor_centavos": valor, "pendencias": pendencias}
 
 
 # --- BOLETOS ---
