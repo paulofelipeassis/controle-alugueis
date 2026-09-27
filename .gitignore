@@ -1,0 +1,14 @@
+# Streamlit secrets (Google service account, login credentials, cookie key)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
