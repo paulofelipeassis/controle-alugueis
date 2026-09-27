@@ -11,6 +11,18 @@ Google Sheet named **"Controle de Aluguéis"** is the sole data store, accessed 
 names, UI text) are the domain language of this project — keep new code consistent
 with it rather than translating to English.
 
+## Rewrite in progress — read this first
+
+The app is being rebuilt (SQLite + FastAPI + MCP server for the Hermes Agent, Docker on a
+Hostinger VPS). Before any work on the new system, read, in order:
+
+1. `docs/regras-de-negocio.md` — agreed business rules (do not reopen decisions).
+2. `docs/plano-de-implementacao.md` — step-by-step plan, one branch per stage.
+3. `docs/estrutura-de-pastas.md` — document folder convention.
+
+New code lives in `sistema/`. The Streamlit app described below stays in production,
+untouched, until stage 6 of the plan.
+
 ## Running the app
 
 ```bash
