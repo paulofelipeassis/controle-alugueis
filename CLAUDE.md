@@ -13,15 +13,35 @@ with it rather than translating to English.
 
 ## Rewrite in progress — read this first
 
-The app is being rebuilt (SQLite + FastAPI + MCP server for the Hermes Agent, Docker on a
-Hostinger VPS). Before any work on the new system, read, in order:
+The app is being rebuilt as a new system in `sistema/` (SQLite + FastAPI web pages + MCP
+server for the Hermes Agent, Docker on a Hostinger VPS). Stages 1–5 of the plan are
+implemented; stage 4's server install and stage 6 (switch-over) need Paulo on the server.
+Before any work on the new system, read, in order:
 
 1. `docs/regras-de-negocio.md` — agreed business rules (do not reopen decisions).
-2. `docs/plano-de-implementacao.md` — step-by-step plan, one branch per stage.
-3. `docs/estrutura-de-pastas.md` — document folder convention.
+2. `docs/plano-de-implementacao.md` — step-by-step plan and its current status.
+3. `docs/estrutura-de-pastas.md` — document folder convention; `docs/hermes.md` — guide for
+   Hermes; `docs/instalacao-servidor.md` — server install.
 
-New code lives in `sistema/`. The Streamlit app described below stays in production,
-untouched, until stage 6 of the plan.
+New system commands (from the repo root):
+
+```bash
+pip install -r sistema/requirements.txt
+python -m pytest sistema/tests -q              # all tests (uses temp DBs)
+uvicorn sistema.web:app --reload               # web pages on :8000
+MCP_TOKEN=x python -m sistema.mcp_server       # MCP on :8001/mcp
+python -m scripts.demo                         # prints a sample dashboard
+python -m scripts.criar_usuario                # creates a login
+```
+
+New system architecture: `servicos.py` is the **only** writer (every write audited, raises
+`ErroDeNegocio` with a Portuguese message); `consultas.py` has all reads/reports;
+`regras.py` holds pure date/money/status rules; `web.py` and `mcp_server.py` only translate
+parameters and call those two. Money is integer centavos, dates ISO text, statuses are
+computed, never stored. `config.py` values are read as `config.X` at call time so tests can
+monkeypatch them.
+
+The Streamlit app described below stays in production, untouched, until stage 6.
 
 ## Running the app
 
@@ -30,7 +50,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-There are no lint, test, or build scripts in this repo.
+The Streamlit app has no lint, test, or build scripts (the new system in `sistema/` has pytest tests, see above).
 
 ### Required secrets (`.streamlit/secrets.toml`, never committed)
 

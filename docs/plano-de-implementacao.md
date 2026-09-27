@@ -4,6 +4,28 @@ Passo a passo para construir o sistema descrito em
 [`regras-de-negocio.md`](regras-de-negocio.md). **Leia as regras de negócio inteiras antes de
 começar qualquer etapa.**
 
+## Situação atual (27/09/2026)
+
+| Etapa | Situação |
+|---|---|
+| 1 e 2 — banco, regras, cobranças, relatórios | ✅ Feita, com testes |
+| 3 — MCP do Hermes | ✅ Feita, com testes (inclusive de rede) e `docs/hermes.md` |
+| 4 — Docker e backup | ✅ Arquivos prontos e testados num Docker local. **Falta instalar no servidor com o Paulo:** [`instalacao-servidor.md`](instalacao-servidor.md) |
+| 5 — Páginas web | ✅ Feita, com testes e verificação visual em tela de celular |
+| 6 — Virada | ⏳ Depende do Paulo (domínio, uso em paralelo, desligar o Streamlit) |
+
+Diferenças em relação ao plano abaixo, e por quê:
+- Tudo foi feito numa branch só, e não uma por etapa, porque o Paulo pediu para seguir até o
+  fim sem parar entre as etapas.
+- Biblioteca `mcp` **1.x** (`FastMCP`), não a 2.x: a 1.x é a mais usada pelos clientes MCP
+  atuais, e isso reduz o risco de incompatibilidade com o Hermes.
+- MCP sem estado (`stateless_http`) e `host="0.0.0.0"`: a proteção automática da biblioteca
+  só aceita conexões locais e bloquearia o Hermes dentro do Docker. A proteção é o token.
+- O container roda como root, porque a pasta de documentos é compartilhada com o Hermes e o
+  File Browser, e assim não há problema de permissão de arquivo.
+- As cobranças não precisam de agendamento: são geradas (de forma idempotente) sempre que
+  uma consulta depende delas.
+
 ## 0. Como trabalhar (leia antes de tudo)
 
 ### Sobre o Paulo

@@ -89,6 +89,12 @@ def _ir(url):
     return RedirectResponse(url, status_code=303)
 
 
+def _local(url, padrao="/"):
+    """Só aceita endereço interno do próprio sistema (evita redirecionar para outro site)."""
+    url = str(url or "")
+    return url if url.startswith("/") and not url.startswith("//") else padrao
+
+
 async def _form(request):
     return {chave: (valor.strip() if isinstance(valor, str) else valor) for chave, valor in (await request.form()).items()}
 
@@ -564,8 +570,7 @@ def pagamentos(request: Request, data_de: str = "", data_ate: str = "", grupo: s
 @app.post("/pagamentos/{pagamento_id}/cancelar")
 async def pagamento_cancelar(request: Request, pagamento_id: int):
     form = await _form(request)
-    voltar = form.get("voltar") or "/pagamentos"
-    return _acao(request, voltar if voltar.startswith("/") else "/pagamentos",
+    return _acao(request, _local(form.get("voltar"), "/pagamentos"),
                  lambda: servicos.cancelar_pagamento(_quem(request), pagamento_id, form.get("motivo")),
                  "Pagamento cancelado.")
 
@@ -594,7 +599,7 @@ def auditoria(request: Request, entidade: str = ""):
 @app.post("/documentos")
 async def documento_enviar(request: Request):
     form = await _form(request)
-    voltar = form.get("voltar") if str(form.get("voltar", "")).startswith("/") else "/"
+    voltar = _local(form.get("voltar"))
     arquivo = form.get("arquivo")
 
     def salvar():
