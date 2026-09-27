@@ -18,26 +18,3 @@
 
 {% macro selo(situacao) %}<span class="selo {{ situacao }}">{{ ROTULOS.get(situacao, situacao) }}</span>{% endmacro %}
 
-{% macro documentos(lista, entidade, entidade_id, voltar) %}
-<h3>Documentos</h3>
-{% if lista %}
-<ul>
-  {% for d in lista %}<li><a href="/documentos/{{ d.id }}" target="_blank">{{ d.caminho.split('/')[-1] }}</a>
-    <small>({{ d.tipo }}, {{ d.registrado_em|data }}, {{ d.registrado_por }})</small></li>{% endfor %}
-</ul>
-{% else %}<p><small>Nenhum documento.</small></p>{% endif %}
-<details class="acao">
-  <summary>Enviar documento</summary>
-  <form method="post" action="/documentos" enctype="multipart/form-data">
-    <input type="hidden" name="entidade" value="{{ entidade }}">
-    <input type="hidden" name="entidade_id" value="{{ entidade_id }}">
-    <input type="hidden" name="voltar" value="{{ voltar }}">
-    <label>Tipo
-      <select name="tipo">{% for v, r in TIPOS_DOCUMENTO %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
-    </label>
-    <label>Arquivo * <input type="file" name="arquivo" required></label>
-    <label>Descrição <input type="text" name="descricao"></label>
-    <button type="submit">Enviar</button>
-  </form>
-</details>
-{% endmacro %}

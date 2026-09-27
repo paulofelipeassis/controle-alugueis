@@ -3,14 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from sistema import consultas, reajuste, regras, servicos
+from sistema import consultas, regras, servicos
 from sistema.regras import ErroDeNegocio
-
-
-def _meses(pct):
-    """Simula o Banco Central: 12 meses com a mesma variação."""
-    return lambda indice: [(f"2025-{m:02d}" if m >= 9 else f"2026-{m:02d}", str(pct))
-                           for m in [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8]]
 
 
 _contador = iter(range(10_000_000_000, 99_999_999_999))
@@ -53,29 +47,6 @@ def test_contrato_antigo_exige_data_do_valor_atual():
     assert [a for a in consultas.alertas(hoje="2027-02-15") if a["tipo"] == "reajuste"]
 
 
-def test_sugestao():
-    contrato = _contrato()
-    s = reajuste.sugerir(contrato, buscar=_meses("0.5"))
-    assert s["percentual"] == "6.17" and s["valor_sugerido"] == "R$ 1.592,55"
-    assert s["vigente_desde"] == "2026-10-05"
-    assert s["resumo"] == "IGP-M de 09/2025 a 08/2026 = 6,17%: R$ 1.500,00 → R$ 1.592,55 a partir de 05/10/2026"
-    assert s["motivo"] == "IGP-M 6,17% (09/2025 a 08/2026)"
-
-
-def test_sugestao_com_indice_negativo_mantem_valor():
-    s = reajuste.sugerir(_contrato(), buscar=_meses("-0.3"))
-    assert s["valor_sugerido_centavos"] == 150000 and "valor mantido" in s["resumo"]
-
-
-def test_sugestao_sem_indice_ou_fora_do_ar():
-    assert "à mão" in reajuste.sugerir(_contrato(indice="INPC"), buscar=_meses("1"))["erro"]
-
-    def fora_do_ar(indice):
-        raise OSError("sem conexão")
-
-    assert "Banco Central" in reajuste.sugerir(_contrato(), buscar=fora_do_ar)["erro"]
-
-
 def test_boleto_13_so_sai_reajustado():
     """A cobrança que vence no aniversário fica marcada até o reajuste do ano ser registrado."""
     contrato = _contrato()
@@ -85,8 +56,7 @@ def test_boleto_13_so_sai_reajustado():
     alerta = [a for a in consultas.alertas(hoje="2026-09-28") if a["tipo"] == "reajuste"][0]
     assert "Registre antes de emitir o boleto" in alerta["mensagem"]
 
-    s = reajuste.sugerir(contrato, buscar=_meses("0.5"))
-    servicos.registrar_reajuste("paulo", contrato, s["valor_sugerido_centavos"], s["vigente_desde"], s["motivo"])
+    servicos.registrar_reajuste("paulo", contrato, 159255, "2026-10-05", "IGP-M 6,17%")
     outubro = consultas.listar_cobrancas(competencia="2026-10", contrato_id=contrato, hoje="2026-09-28")[0]
     assert outubro["valor_centavos"] == 159255 and outubro["reajuste_pendente"] is False
     assert not [a for a in consultas.alertas(hoje="2026-09-28") if a["tipo"] == "reajuste"]

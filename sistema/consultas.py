@@ -39,8 +39,7 @@ def _imovel_nome(linha):
 def obter(entidade, entidade_id):
     """Uma linha de uma tabela, como dict (para formulários de edição)."""
     tabelas = {"imovel": "imoveis", "locatario": "locatarios", "corretor": "corretores", "contrato": "contratos",
-               "cobranca": "cobrancas", "pagamento": "pagamentos", "pendencia": "pendencias",
-               "documento": "documentos"}
+               "cobranca": "cobrancas", "pagamento": "pagamentos", "pendencia": "pendencias"}
     if entidade not in tabelas:
         raise ErroDeNegocio(f"Entidade inválida: '{entidade}'.")
     with db.leitura() as con:
@@ -103,13 +102,6 @@ def listar_corretores():
 def listar_usuarios():
     with db.leitura() as con:
         return _dicts(con.execute("SELECT id, login, nome, ativo FROM usuarios ORDER BY nome"))
-
-
-def _documentos(con, entidade, entidade_id):
-    return _dicts(con.execute(
-        "SELECT * FROM documentos WHERE entidade = ? AND entidade_id = ? ORDER BY registrado_em",
-        (entidade, entidade_id),
-    ))
 
 
 # --- CONTRATOS ---
@@ -275,7 +267,6 @@ def ficha_imovel(imovel_id, hoje=None):
     with db.leitura() as con:
         contratos = [_contrato(con, linha, hoje) for linha in con.execute(
             _SQL_CONTRATOS + "WHERE c.imovel_id = ? ORDER BY c.data_inicio DESC", (imovel_id,))]
-        imovel["documentos"] = _documentos(con, "imovel", imovel_id)
     imovel["contrato_atual"] = next((c for c in contratos if c["status"] == "ativo"), None)
     imovel["contratos"] = contratos
     return imovel
@@ -292,7 +283,6 @@ def ficha_locatario(locatario_id, hoje=None):
         locatario["contratos"] = [_contrato(con, c, hoje) for c in con.execute(
             _SQL_CONTRATOS + "WHERE c.locatario_id = ? ORDER BY c.data_inicio DESC", (locatario_id,))]
         cobrancas = _cobrancas(con, hoje, "WHERE c.locatario_id = ? AND cb.situacao = 'normal'", (locatario_id,))
-        locatario["documentos"] = _documentos(con, "locatario", locatario_id)
     locatario["total_atrasado_centavos"] = sum(
         c["saldo_centavos"] for c in cobrancas if c["situacao_calculada"] == "atrasada")
     locatario["total_atualizado_centavos"] = sum(
@@ -317,7 +307,6 @@ def extrato_contrato(contrato_id, hoje=None):
         pagamentos = _dicts(con.execute(
             "SELECT p.* FROM pagamentos p JOIN cobrancas cb ON cb.id = p.cobranca_id WHERE cb.contrato_id = ? "
             "ORDER BY p.data_pagamento, p.id", (contrato_id,)))
-        contrato["documentos"] = _documentos(con, "contrato", contrato_id)
     for cobranca in cobrancas:
         cobranca["pagamentos"] = [_com_reais(p) for p in pagamentos if p["cobranca_id"] == cobranca["id"]]
     contrato["cobrancas"] = cobrancas

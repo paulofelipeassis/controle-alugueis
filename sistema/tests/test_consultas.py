@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from sistema import config, consultas, servicos
+from sistema import arquivos, config, consultas, servicos
 from sistema.regras import ErroDeNegocio
 
 
@@ -66,30 +66,25 @@ def test_busca_e_historico(cenario):
     assert consultas.historico_pagamentos(data_de="2026-11-01")["quantidade"] == 0
 
 
-def test_pasta_documento(cenario):
-    assert servicos.pasta_documento("imovel", cenario["imovel"]) == "imoveis/Anel Viario - Apto 101/imovel"
-    assert servicos.pasta_documento("locatario", cenario["locatario"]) == "locatarios/12345678900 - Maria Souza"
-    assert servicos.pasta_documento("contrato", cenario["contrato"]) == \
+def test_pasta_de_arquivos(cenario):
+    assert arquivos.pasta("imovel", cenario["imovel"]) == "imoveis/Anel Viario - Apto 101/imovel"
+    assert arquivos.pasta("locatario", cenario["locatario"]) == "locatarios/12345678900 - Maria Souza"
+    assert arquivos.pasta("contrato", cenario["contrato"]) == \
         "imoveis/Anel Viario - Apto 101/contratos/2026-10 - Maria Souza"
 
 
-def test_documentos(cenario):
-    doc = servicos.salvar_documento("t", "contrato", cenario["contrato"], "contrato-assinado", "scan.PDF", b"%PDF")
-    doc2 = servicos.salvar_documento("t", "contrato", cenario["contrato"], "contrato-assinado", "scan.pdf", b"%PDF")
-    caminhos = [d["caminho"] for d in consultas.extrato_contrato(cenario["contrato"])["documentos"]]
-    assert caminhos == ["imoveis/Anel Viario - Apto 101/contratos/2026-10 - Maria Souza/contrato-assinado.pdf",
-                        "imoveis/Anel Viario - Apto 101/contratos/2026-10 - Maria Souza/contrato-assinado-2.pdf"]
-    # Registrar de novo o mesmo arquivo devolve o mesmo documento.
-    assert servicos.registrar_documento("hermes", "contrato", cenario["contrato"], "contrato-assinado",
-                                        caminhos[0]) == doc
-    assert doc != doc2
+def test_arquivos_nao_saem_da_pasta_de_documentos(cenario):
+    pasta = arquivos.pasta("contrato", cenario["contrato"])
+    caminho = arquivos.salvar(pasta, "comprovante-2026-10", ".PDF", b"%PDF")
+    assert caminho == f"{pasta}/comprovante-2026-10.pdf"
+    assert arquivos.salvar(pasta, "comprovante-2026-10", ".pdf", b"%PDF") == f"{pasta}/comprovante-2026-10-2.pdf"
+    assert arquivos.caminho_relativo(str(Path(config.DOCS_DIR).resolve() / caminho)) == caminho
     with pytest.raises(ErroDeNegocio, match="inválido"):
-        servicos.registrar_documento("hermes", "contrato", cenario["contrato"], "x", "../../etc/passwd")
+        arquivos.caminho_relativo("../../etc/passwd")
     with pytest.raises(ErroDeNegocio, match="dentro da pasta"):
-        servicos.registrar_documento("hermes", "contrato", cenario["contrato"], "x", "/etc/passwd")
-    # Caminho absoluto dentro da pasta de documentos é aceito.
-    absoluto = str(Path(config.DOCS_DIR).resolve() / caminhos[0])
-    assert servicos.registrar_documento("hermes", "contrato", cenario["contrato"], "x", absoluto) == doc
+        arquivos.caminho_relativo("/etc/passwd")
+    with pytest.raises(ErroDeNegocio, match="não encontrado"):
+        arquivos.caminho_relativo("nao/existe.pdf")
 
 
 def test_erro_de_entidade_inexistente():

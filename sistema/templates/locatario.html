@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import selo, documentos %}
+{% from "_macros.html" import selo %}
 {% block conteudo %}
 <h2>{{ l.nome }}</h2>
 <ul>
@@ -27,7 +27,7 @@
   {% else %}<tr><td colspan="4">Nenhum contrato.</td></tr>{% endfor %}
   </tbody>
 </table></div>
-{{ documentos(l.documentos, "locatario", l.id, "/locatarios/" ~ l.id) }}
+{% if modulo_ativo("documentos") %}{% with entidade="locatario", entidade_id=l.id, voltar="/locatarios/" ~ l.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 {% if not l.contratos %}
 <form method="post" action="/locatarios/{{ l.id }}/apagar" onsubmit="return confirm('Apagar este locatário?')">
   <button type="submit" class="secondary outline">Apagar locatário</button>

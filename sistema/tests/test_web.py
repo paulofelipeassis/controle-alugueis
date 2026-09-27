@@ -1,19 +1,9 @@
 import re
 
-import pytest
 from fastapi.testclient import TestClient
 
 from sistema import consultas, servicos
 from sistema.web import app
-
-
-@pytest.fixture
-def cliente():
-    servicos.criar_usuario("paulo", "Paulo", "senha-segura")
-    c = TestClient(app)
-    r = c.post("/login", data={"login": "paulo", "senha": "senha-segura"})
-    assert r.status_code == 200 and "Painel" in r.text
-    return c
 
 
 def test_sem_login_vai_para_login():
@@ -99,17 +89,6 @@ def test_acoes_do_contrato_e_cobranca(cliente):
     assert "Pendência resolvida" in r.text
 
 
-def test_documentos_upload_e_download(cliente):
-    imovel = servicos.cadastrar_imovel("t", "Anel Viário", "Apto 101", "E")
-    r = cliente.post("/documentos", data={"entidade": "imovel", "entidade_id": imovel, "tipo": "foto",
-                                          "voltar": f"/imoveis/{imovel}"},
-                     files={"arquivo": ("Fachada.JPG", b"imagem", "image/jpeg")})
-    assert "Documento enviado" in r.text and "fachada.jpg" in r.text
-    doc = consultas.ficha_imovel(imovel)["documentos"][0]
-    assert doc["caminho"] == "imoveis/Anel Viario - Apto 101/imovel/fachada.jpg"
-    assert cliente.get(f"/documentos/{doc['id']}").content == b"imagem"
-
-
 def test_id_inexistente_mostra_erro(cliente):
     r = cliente.get("/contratos/999")
     assert "não encontrado" in r.text
@@ -121,24 +100,3 @@ def test_trocar_senha(cliente):
     assert servicos.autenticar("paulo", "nova-senha-1")
 
 
-
-def test_reajuste_pela_web(cliente, monkeypatch):
-    from sistema import reajuste
-
-    imovel = servicos.cadastrar_imovel("t", "G", "U", "E")
-    loc = servicos.cadastrar_locatario("t", "N", "12345678900", "n@x.com")
-    dados = {"imovel_id": imovel, "locatario_id": loc, "data_inicio": "2024-10-05",
-             "data_fim_prevista": "2027-10-04", "valor_aluguel": "1.500,00", "dia_vencimento": "5",
-             "multa_pct": "2", "juros_mes_pct": "1", "garantia_tipo": "nenhuma", "indice_reajuste": "IGP-M"}
-    r = cliente.post("/contratos/novo", data=dados)
-    assert "último reajuste" in r.text  # contrato antigo sem a data do valor atual
-    r = cliente.post("/contratos/novo", data={**dados, "valor_vigente_desde": "2025-10-05"})
-    assert "Contrato criado" in r.text and "Calcular pelo IGP-M" in r.text
-    contrato = int(str(r.url).rsplit("/", 1)[1])
-    monkeypatch.setattr(reajuste, "ultimos_12_meses",
-                        lambda indice: [(f"2025-{m:02d}", "0.5") for m in range(1, 13)])
-    r = cliente.get(f"/contratos/{contrato}/reajuste")
-    assert "6,17%" in r.text and 'value="1.592,55"' in r.text and 'value="2026-10-05"' in r.text
-    r = cliente.post(f"/contratos/{contrato}/reajuste",
-                     data={"novo_valor": "1.580,00", "vigente_desde": "2026-10-05", "motivo": "IGP-M combinado"})
-    assert "Reajuste registrado" in r.text and "R$ 1.580,00 desde 05/10/2026" in r.text

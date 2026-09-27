@@ -120,17 +120,6 @@ CREATE TABLE IF NOT EXISTS pendencias (
   resolucao TEXT
 );
 
-CREATE TABLE IF NOT EXISTS documentos (
-  id INTEGER PRIMARY KEY,
-  entidade TEXT NOT NULL CHECK (entidade IN ('imovel','locatario','contrato')),
-  entidade_id INTEGER NOT NULL,
-  tipo TEXT NOT NULL,
-  caminho TEXT NOT NULL UNIQUE,           -- relativo a DOCS_DIR
-  descricao TEXT,
-  registrado_por TEXT NOT NULL,
-  registrado_em TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY,
   quando TEXT NOT NULL,

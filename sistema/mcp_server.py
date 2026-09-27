@@ -13,7 +13,7 @@ import json
 
 from mcp.server.fastmcp import FastMCP
 
-from sistema import config, consultas, regras, servicos
+from sistema import arquivos, config, consultas, modulos, regras, servicos
 
 HERMES = "hermes"
 
@@ -63,7 +63,7 @@ def listar_imoveis(situacao: str | None = None) -> list:
 
 @mcp.tool()
 def ficha_imovel(imovel_id: int) -> dict:
-    """Dados do imóvel, situação, contrato atual, histórico de contratos e documentos."""
+    """Dados do imóvel, situação, contrato atual e histórico de contratos."""
     return consultas.ficha_imovel(imovel_id)
 
 
@@ -76,8 +76,8 @@ def buscar_locatarios(texto: str) -> list:
 
 @mcp.tool()
 def ficha_locatario(locatario_id: int) -> dict:
-    """Dados do locatário, todos os contratos (atuais e antigos), total atrasado, total a
-    vencer e documentos."""
+    """Dados do locatário, todos os contratos (atuais e antigos), total atrasado e total a
+    vencer."""
     return consultas.ficha_locatario(locatario_id)
 
 
@@ -90,7 +90,7 @@ def listar_contratos(ativos: bool | None = True) -> list:
 @mcp.tool()
 def extrato_contrato(contrato_id: int) -> dict:
     """Tudo de um contrato: dados, histórico de valores, cada cobrança (valor, pago, saldo,
-    situação, boleto, pagamentos) e documentos. Use para escolher a cobrança certa antes de
+    situação, boleto, pagamentos). Use para escolher a cobrança certa antes de
     registrar um pagamento."""
     return consultas.extrato_contrato(contrato_id)
 
@@ -149,9 +149,9 @@ def listar_pendencias() -> list:
 @mcp.tool()
 def pasta_documento(entidade: str, entidade_id: int) -> dict:
     """Pasta (relativa à pasta de documentos) onde guardar arquivos de um 'imovel',
-    'locatario' ou 'contrato'. Salve o arquivo lá e depois chame registrar_documento (ou
-    passe o caminho como comprovante em registrar_pagamento)."""
-    return {"pasta": servicos.pasta_documento(entidade, entidade_id)}
+    'locatario' ou 'contrato'. Salve o arquivo lá e passe o caminho (relativo) como
+    comprovante em registrar_pagamento ou, se existir, em registrar_documento."""
+    return {"pasta": arquivos.pasta(entidade, entidade_id)}
 
 
 # ============ CADASTROS ============
@@ -215,21 +215,11 @@ def criar_contrato(imovel_id: int, locatario_id: int, data_inicio: str, data_fim
 def registrar_reajuste(contrato_id: int, novo_valor: str, vigente_desde: str, motivo: str | None = None) -> dict:
     """Registra novo valor de aluguel a partir de uma data (AAAA-MM-DD). O valor antigo fica
     no histórico. Cobranças futuras sem boleto e sem pagamento passam a ter o valor novo.
-    Use sugerir_reajuste para calcular e SÓ registre depois que o Paulo aprovar. Para não
+    Se existir a ferramenta sugerir_reajuste, use-a para calcular. SÓ registre depois que o
+    Paulo aprovar. Para não
     reajustar naquele ano, registre o mesmo valor (motivo 'sem reajuste')."""
     servicos.registrar_reajuste(HERMES, contrato_id, _centavos(novo_valor, "novo valor"), vigente_desde, motivo)
     return {"ok": True}
-
-
-@mcp.tool()
-def sugerir_reajuste(contrato_id: int) -> dict:
-    """Calcula agora o reajuste anual sugerido: acumulado das últimas 12 variações publicadas do
-    IPCA ou IGP-M do contrato (Banco Central). Índice negativo = valor mantido. Não grava nada:
-    mostre o 'resumo' ao Paulo e, só depois do "sim" dele, chame registrar_reajuste com
-    novo_valor = valor_sugerido (ou o valor que ele disser), vigente_desde e motivo."""
-    from sistema import reajuste
-
-    return reajuste.sugerir(contrato_id)
 
 
 @mcp.tool()
@@ -293,20 +283,18 @@ def registrar_pagamento(cobranca_id: int, data_pagamento: str, valor_pago: str, 
 
 # ============ DOCUMENTOS E PENDÊNCIAS ============
 @mcp.tool()
-def registrar_documento(entidade: str, entidade_id: int, tipo: str, caminho: str,
-                        descricao: str | None = None) -> dict:
-    """Liga ao sistema um arquivo que você já salvou na pasta de documentos. entidade:
-    'imovel', 'locatario' ou 'contrato'. tipo: ex. 'contrato-assinado', 'vistoria-entrada',
-    'vistoria-saida', 'aditivo', 'documento-pessoal'. caminho: relativo à pasta de documentos."""
-    return {"documento_id": servicos.registrar_documento(HERMES, entidade, entidade_id, tipo, caminho, descricao)}
-
-
-@mcp.tool()
 def criar_pendencia(descricao: str, tipo: str = "outro", entidade: str | None = None,
                     entidade_id: int | None = None) -> dict:
     """Cria uma pendência para uma pessoa olhar (ex.: comprovante ilegível, valor estranho,
     dúvida). Prefira isso a adivinhar."""
     return servicos.criar_pendencia(HERMES, tipo, descricao, entidade, entidade_id)
+
+
+# ============ MÓDULOS OPCIONAIS (sistema/modulos/*/mcp.py) ============
+for _nome in modulos.nomes():
+    _mcp = modulos.carregar(_nome, "mcp")
+    if _mcp is not None:
+        _mcp.registrar(mcp)
 
 
 # ============ SERVIDOR HTTP COM TOKEN ============

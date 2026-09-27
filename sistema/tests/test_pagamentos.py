@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from sistema import config, consultas, db, servicos
+from sistema import arquivos, config, consultas, db, servicos
 from sistema.regras import ErroDeNegocio
 
 
@@ -118,7 +118,7 @@ def test_forma_invalida_e_comprovante(cenario):
         servicos.registrar_pagamento("t", out, "2026-10-10", 150000, "cheque")
     with pytest.raises(ErroDeNegocio, match="não encontrado"):
         servicos.registrar_pagamento("t", out, "2026-10-10", 150000, "pix", comprovante_caminho="nao/existe.pdf")
-    pasta = servicos.pasta_documento("contrato", cenario["contrato"])
+    pasta = arquivos.pasta("contrato", cenario["contrato"])
     arquivo = Path(config.DOCS_DIR) / pasta / "comprovante-2026-10.pdf"
     arquivo.parent.mkdir(parents=True)
     arquivo.write_bytes(b"%PDF")

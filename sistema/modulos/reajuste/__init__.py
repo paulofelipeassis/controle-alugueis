@@ -5,9 +5,8 @@ Só busca o índice quando alguém pede (pela tela do contrato ou pelo Hermes): 
 acumulado. Não grava nada; quem registra o reajuste é uma pessoa, com
 `servicos.registrar_reajuste`.
 
-Para remover esta função do sistema: apagar este arquivo, a rota
-`/contratos/{id}/reajuste` (GET) em web.py e a ferramenta `sugerir_reajuste` em
-mcp_server.py. Nada mais depende dele.
+Para remover: apagar esta pasta. O núcleo continua avisando do reajuste anual e
+registrando o valor à mão (servicos.registrar_reajuste).
 """
 import json
 import urllib.request

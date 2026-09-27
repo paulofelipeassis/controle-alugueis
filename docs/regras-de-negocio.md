@@ -105,6 +105,8 @@ Regras:
     ficam marcadas "reajuste pendente" até o reajuste do ano ser registrado, e o Hermes não
     emite boleto delas antes disso.
   - Outro índice (ex.: INPC) ou Banco Central fora do ar: registrar o valor à mão.
+  - O cálculo pelo índice é um **módulo opcional** (`sistema/modulos/reajuste/`). O alerta, a
+    marcação do 13º boleto e o registro do reajuste são do núcleo.
 - **Contrato que já existia antes do sistema:** é cadastrado com a **data de início
   verdadeira** e o **valor atual**, mais a **data desde quando vale o valor atual** (data do
   último reajuste). Esta última é obrigatória se o contrato começou há mais de 1 ano, porque é
@@ -201,6 +203,8 @@ dizendo o que foi feito. Aparecem em destaque no painel.
   dono da convenção: ele calcula a pasta certa de cada documento e o Hermes pergunta ao
   sistema onde salvar.
 - Upload também pela web (redundância).
+- É um **módulo opcional** (`sistema/modulos/documentos/`): pode ser removido sem afetar o
+  resto. Os comprovantes de pagamento não dependem dele (ficam no próprio pagamento).
 - A convenção foi enviada ao Hermes **como sugestão**: ele deve comparar com a estrutura
   que já usa e confirmar diferenças com o Paulo. Não dar ordens ao Hermes sobre isso.
 

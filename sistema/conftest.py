@@ -26,3 +26,17 @@ def cenario():
     contrato = servicos.criar_contrato("teste", imovel, locatario, "2026-10-05", "2027-10-04", 10, 150000,
                                        indice_reajuste="IGP-M")
     return {"imovel": imovel, "locatario": locatario, "contrato": contrato}
+
+
+@pytest.fixture
+def cliente():
+    """Navegador de teste já logado como 'paulo'."""
+    from fastapi.testclient import TestClient
+
+    from sistema.web import app
+
+    servicos.criar_usuario("paulo", "Paulo", "senha-segura")
+    c = TestClient(app)
+    r = c.post("/login", data={"login": "paulo", "senha": "senha-segura"})
+    assert r.status_code == 200 and "Painel" in r.text
+    return c

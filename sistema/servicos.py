@@ -9,23 +9,19 @@ A web e o MCP (Hermes) chamam estas mesmas funções. Regras:
 import json
 import sqlite3
 from datetime import timedelta
-from pathlib import Path, PurePosixPath
 
 import bcrypt
 
-from sistema import config, db, regras
+from sistema import arquivos, config, db, regras
 from sistema.regras import ErroDeNegocio, para_data
 
 FORMAS_PAGAMENTO = ("boleto", "pix", "transferencia", "dinheiro", "outro")
 TIPOS_GARANTIA = ("caucao", "fiador", "seguro_fianca", "nenhuma")
-ENTIDADES_DOCUMENTO = ("imovel", "locatario", "contrato")
-# Documentos com nome de arquivo fixo dentro da pasta (ver docs/estrutura-de-pastas.md).
-NOMES_FIXOS = ("contrato-assinado", "vistoria-entrada", "vistoria-saida")
 TOLERANCIA_CENTAVOS = 100  # diferença até R$ 1,00 não vira pendência
 
 
 # --- AUXILIARES ---
-def _auditar(con, quem, acao, entidade=None, entidade_id=None, **detalhes):
+def auditar(con, quem, acao, entidade=None, entidade_id=None, **detalhes):
     con.execute(
         "INSERT INTO auditoria (quando, quem, acao, entidade, entidade_id, detalhes) VALUES (?, ?, ?, ?, ?, ?)",
         (regras.agora(), quem, acao, entidade, entidade_id,
@@ -100,7 +96,7 @@ def _nova_pendencia(con, quem, tipo, descricao, entidade=None, entidade_id=None)
         "VALUES (?, ?, ?, ?, ?, ?)",
         (tipo, descricao, entidade, entidade_id, regras.agora(), quem),
     )
-    _auditar(con, quem, "criar_pendencia", "pendencia", cur.lastrowid, tipo=tipo, descricao=descricao)
+    auditar(con, quem, "criar_pendencia", "pendencia", cur.lastrowid, tipo=tipo, descricao=descricao)
     return {"pendencia_id": cur.lastrowid, "tipo": tipo, "descricao": descricao}
 
 
@@ -153,7 +149,7 @@ def cadastrar_imovel(quem, grupo, unidade, endereco, iptu_anual_centavos=None, m
                 f"INSERT INTO imoveis ({', '.join(campos)}) VALUES ({', '.join('?' * len(campos))})",
                 tuple(campos.values()),
             )
-            _auditar(con, quem, "cadastrar_imovel", "imovel", cur.lastrowid, **campos)
+            auditar(con, quem, "cadastrar_imovel", "imovel", cur.lastrowid, **campos)
             return cur.lastrowid
     except sqlite3.IntegrityError:
         raise _erro_imovel_duplicado(campos) from None
@@ -165,7 +161,7 @@ def atualizar_imovel(quem, imovel_id, **dados):
         with db.transacao() as con:
             _obter(con, "imoveis", imovel_id, "Imóvel")
             _atualizar(con, "imoveis", imovel_id, campos)
-            _auditar(con, quem, "atualizar_imovel", "imovel", imovel_id, **campos)
+            auditar(con, quem, "atualizar_imovel", "imovel", imovel_id, **campos)
     except sqlite3.IntegrityError:
         raise _erro_imovel_duplicado(campos) from None
 
@@ -175,9 +171,8 @@ def apagar_imovel(quem, imovel_id):
         imovel = _obter(con, "imoveis", imovel_id, "Imóvel")
         if _tem_contratos(con, "imovel_id", imovel_id):
             raise ErroDeNegocio("Esse imóvel tem contratos e não pode ser apagado.")
-        con.execute("DELETE FROM documentos WHERE entidade = 'imovel' AND entidade_id = ?", (imovel_id,))
         con.execute("DELETE FROM imoveis WHERE id = ?", (imovel_id,))
-        _auditar(con, quem, "apagar_imovel", "imovel", imovel_id, **dict(imovel))
+        auditar(con, quem, "apagar_imovel", "imovel", imovel_id, **dict(imovel))
 
 
 # --- LOCATÁRIOS ---
@@ -215,7 +210,7 @@ def cadastrar_locatario(quem, nome, cpf_cnpj, email, telefone=None, observacoes=
                 f"INSERT INTO locatarios ({', '.join(campos)}) VALUES ({', '.join('?' * len(campos))})",
                 tuple(campos.values()),
             )
-            _auditar(con, quem, "cadastrar_locatario", "locatario", cur.lastrowid, **campos)
+            auditar(con, quem, "cadastrar_locatario", "locatario", cur.lastrowid, **campos)
             return cur.lastrowid
     except sqlite3.IntegrityError:
         raise _erro_cpf_duplicado(campos["cpf_cnpj"]) from None
@@ -227,7 +222,7 @@ def atualizar_locatario(quem, locatario_id, **dados):
         with db.transacao() as con:
             _obter(con, "locatarios", locatario_id, "Locatário")
             _atualizar(con, "locatarios", locatario_id, campos)
-            _auditar(con, quem, "atualizar_locatario", "locatario", locatario_id, **campos)
+            auditar(con, quem, "atualizar_locatario", "locatario", locatario_id, **campos)
     except sqlite3.IntegrityError:
         raise _erro_cpf_duplicado(campos.get("cpf_cnpj")) from None
 
@@ -237,9 +232,8 @@ def apagar_locatario(quem, locatario_id):
         locatario = _obter(con, "locatarios", locatario_id, "Locatário")
         if _tem_contratos(con, "locatario_id", locatario_id):
             raise ErroDeNegocio("Esse locatário tem contratos e não pode ser apagado.")
-        con.execute("DELETE FROM documentos WHERE entidade = 'locatario' AND entidade_id = ?", (locatario_id,))
         con.execute("DELETE FROM locatarios WHERE id = ?", (locatario_id,))
-        _auditar(con, quem, "apagar_locatario", "locatario", locatario_id, **dict(locatario))
+        auditar(con, quem, "apagar_locatario", "locatario", locatario_id, **dict(locatario))
 
 
 # --- CORRETORES ---
@@ -258,7 +252,7 @@ def cadastrar_corretor(quem, nome, telefone=None, email=None, observacoes=None):
             f"INSERT INTO corretores ({', '.join(campos)}) VALUES ({', '.join('?' * len(campos))})",
             tuple(campos.values()),
         )
-        _auditar(con, quem, "cadastrar_corretor", "corretor", cur.lastrowid, **campos)
+        auditar(con, quem, "cadastrar_corretor", "corretor", cur.lastrowid, **campos)
         return cur.lastrowid
 
 
@@ -267,7 +261,7 @@ def atualizar_corretor(quem, corretor_id, **dados):
     with db.transacao() as con:
         _obter(con, "corretores", corretor_id, "Corretor")
         _atualizar(con, "corretores", corretor_id, campos)
-        _auditar(con, quem, "atualizar_corretor", "corretor", corretor_id, **campos)
+        auditar(con, quem, "atualizar_corretor", "corretor", corretor_id, **campos)
 
 
 def apagar_corretor(quem, corretor_id):
@@ -276,7 +270,7 @@ def apagar_corretor(quem, corretor_id):
         if _tem_contratos(con, "corretor_id", corretor_id):
             raise ErroDeNegocio("Esse corretor tem contratos e não pode ser apagado.")
         con.execute("DELETE FROM corretores WHERE id = ?", (corretor_id,))
-        _auditar(con, quem, "apagar_corretor", "corretor", corretor_id, **dict(corretor))
+        auditar(con, quem, "apagar_corretor", "corretor", corretor_id, **dict(corretor))
 
 
 # --- CONTRATOS ---
@@ -356,7 +350,7 @@ def criar_contrato(quem, imovel_id, locatario_id, data_inicio, data_fim_prevista
             "INSERT INTO valores_aluguel (contrato_id, valor_centavos, vigente_desde, motivo) VALUES (?, ?, ?, ?)",
             (contrato_id, valor, vigente.isoformat(), "inicial" if vigente == inicio else "valor atual no cadastro"),
         )
-        _auditar(con, quem, "criar_contrato", "contrato", contrato_id, valor_centavos=valor, **campos)
+        auditar(con, quem, "criar_contrato", "contrato", contrato_id, valor_centavos=valor, **campos)
     gerar_cobrancas("sistema")
     return contrato_id
 
@@ -369,7 +363,7 @@ def atualizar_contrato(quem, contrato_id, **dados):
         if campos.get("corretor_id") is not None:
             _obter(con, "corretores", campos["corretor_id"], "Corretor")
         _atualizar(con, "contratos", contrato_id, campos)
-        _auditar(con, quem, "atualizar_contrato", "contrato", contrato_id, **campos)
+        auditar(con, quem, "atualizar_contrato", "contrato", contrato_id, **campos)
 
 
 def _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, vigente_desde, motivo):
@@ -391,7 +385,7 @@ def _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, vigente_des
         "  SELECT 1 FROM pagamentos p WHERE p.cobranca_id = cobrancas.id AND p.cancelado_em IS NULL)",
         (valor, contrato_id, desde),
     )
-    _auditar(con, quem, "registrar_reajuste", "contrato", contrato_id, valor_centavos=valor,
+    auditar(con, quem, "registrar_reajuste", "contrato", contrato_id, valor_centavos=valor,
              vigente_desde=desde, motivo=motivo, cobrancas_atualizadas=cur.rowcount)
 
 
@@ -411,7 +405,7 @@ def renovar_contrato(quem, contrato_id, nova_data_fim, novo_valor_centavos=None,
         if nova_fim <= fim_atual:
             raise ErroDeNegocio(f"A nova data de fim precisa ser depois da atual ({fim_atual.isoformat()}).")
         con.execute("UPDATE contratos SET data_fim_prevista = ? WHERE id = ?", (nova_fim.isoformat(), contrato_id))
-        _auditar(con, quem, "renovar_contrato", "contrato", contrato_id,
+        auditar(con, quem, "renovar_contrato", "contrato", contrato_id,
                  data_fim_anterior=fim_atual.isoformat(), nova_data_fim=nova_fim.isoformat())
         if novo_valor_centavos:
             desde = vigente_desde or (fim_atual + timedelta(days=1))
@@ -450,13 +444,13 @@ def encerrar_contrato(quem, contrato_id, data_encerramento, motivo):
                     f"({_rotulo_cobranca(con, cobranca)}): o contrato foi encerrado.",
                     "cobranca", cobranca["id"],
                 ))
-        _auditar(con, quem, "encerrar_contrato", "contrato", contrato_id, data_encerramento=data.isoformat(),
+        auditar(con, quem, "encerrar_contrato", "contrato", contrato_id, data_encerramento=data.isoformat(),
                  motivo=motivo, cobrancas_canceladas=[c["id"] for c in futuras])
     return {"cobrancas_canceladas": len(futuras), "pendencias": pendencias}
 
 
 def apagar_contrato(quem, contrato_id):
-    """Só para contrato cadastrado por engano: sem pagamento, sem boleto e sem documento."""
+    """Só para contrato cadastrado por engano: sem pagamento e sem boleto."""
     with db.transacao() as con:
         contrato = _obter(con, "contratos", contrato_id, "Contrato")
         if con.execute(
@@ -468,14 +462,10 @@ def apagar_contrato(quem, contrato_id):
             "SELECT 1 FROM cobrancas WHERE contrato_id = ? AND boleto_identificador IS NOT NULL", (contrato_id,)
         ).fetchone():
             raise ErroDeNegocio("Esse contrato tem boleto emitido e não pode ser apagado. Encerre-o.")
-        if con.execute(
-            "SELECT 1 FROM documentos WHERE entidade = 'contrato' AND entidade_id = ?", (contrato_id,)
-        ).fetchone():
-            raise ErroDeNegocio("Esse contrato tem documentos e não pode ser apagado. Encerre-o.")
         con.execute("DELETE FROM cobrancas WHERE contrato_id = ?", (contrato_id,))
         con.execute("DELETE FROM valores_aluguel WHERE contrato_id = ?", (contrato_id,))
         con.execute("DELETE FROM contratos WHERE id = ?", (contrato_id,))
-        _auditar(con, quem, "apagar_contrato", "contrato", contrato_id, **dict(contrato))
+        auditar(con, quem, "apagar_contrato", "contrato", contrato_id, **dict(contrato))
 
 
 # --- COBRANÇAS ---
@@ -516,7 +506,7 @@ def gerar_cobrancas(quem="sistema", hoje=None):
                         criadas.append(cur.lastrowid)
                 competencia = regras.proxima_competencia(competencia)
         if criadas:
-            _auditar(con, quem, "gerar_cobrancas", "cobranca", None, cobrancas=criadas)
+            auditar(con, quem, "gerar_cobrancas", "cobranca", None, cobrancas=criadas)
     return len(criadas)
 
 
@@ -538,7 +528,7 @@ def editar_valor_cobranca(quem, cobranca_id, valor_centavos, motivo):
             raise ErroDeNegocio("Essa cobrança já tem boleto. Emita um boleto novo com o valor certo e "
                                 "registre-o como substituto.")
         con.execute("UPDATE cobrancas SET valor_centavos = ? WHERE id = ?", (valor, cobranca_id))
-        _auditar(con, quem, "editar_valor_cobranca", "cobranca", cobranca_id,
+        auditar(con, quem, "editar_valor_cobranca", "cobranca", cobranca_id,
                  valor_anterior=cobranca["valor_centavos"], valor_centavos=valor, motivo=motivo)
 
 
@@ -549,7 +539,7 @@ def _mudar_situacao(quem, cobranca_id, nova, motivo):
         cobranca = _cobranca_sem_movimento(con, cobranca_id, verbo)
         con.execute("UPDATE cobrancas SET situacao = ?, motivo_situacao = ? WHERE id = ?",
                     (nova, motivo, cobranca_id))
-        _auditar(con, quem, f"{verbo}_cobranca", "cobranca", cobranca_id, motivo=motivo)
+        auditar(con, quem, f"{verbo}_cobranca", "cobranca", cobranca_id, motivo=motivo)
         if cobranca["boleto_identificador"]:
             return _nova_pendencia(
                 con, quem, "cancelar_boleto",
@@ -591,7 +581,7 @@ def registrar_boleto(quem, cobranca_id, banco, identificador, linha_digitavel=No
                 "boleto_link = ?, boleto_emitido_em = ?, boleto_enviado_em = NULL WHERE id = ?",
                 (banco, identificador, _texto(linha_digitavel), _texto(link), regras.agora(), cobranca_id),
             )
-            _auditar(con, quem, "registrar_boleto", "cobranca", cobranca_id, banco=banco,
+            auditar(con, quem, "registrar_boleto", "cobranca", cobranca_id, banco=banco,
                      identificador=identificador, boleto_anterior=cobranca["boleto_identificador"])
             return {"cobranca_id": cobranca_id, "ja_existia": False}
     except sqlite3.IntegrityError:
@@ -604,7 +594,7 @@ def marcar_boleto_enviado(quem, cobranca_id):
         if not cobranca["boleto_identificador"]:
             raise ErroDeNegocio("Essa cobrança ainda não tem boleto registrado.")
         con.execute("UPDATE cobrancas SET boleto_enviado_em = ? WHERE id = ?", (regras.agora(), cobranca_id))
-        _auditar(con, quem, "marcar_boleto_enviado", "cobranca", cobranca_id,
+        auditar(con, quem, "marcar_boleto_enviado", "cobranca", cobranca_id,
                  identificador=cobranca["boleto_identificador"])
 
 
@@ -617,7 +607,7 @@ def registrar_pagamento(quem, cobranca_id, data_pagamento, valor_centavos, forma
     if forma not in FORMAS_PAGAMENTO:
         raise ErroDeNegocio(f"Forma de pagamento inválida: '{forma}'. Use: {', '.join(FORMAS_PAGAMENTO)}.")
     identificador_externo = _texto(identificador_externo)
-    comprovante = _caminho_relativo(comprovante_caminho, exigir_arquivo=True) if _texto(comprovante_caminho) else None
+    comprovante = arquivos.caminho_relativo(comprovante_caminho) if _texto(comprovante_caminho) else None
     with db.transacao() as con:
         if identificador_externo:
             existente = con.execute(
@@ -642,7 +632,7 @@ def registrar_pagamento(quem, cobranca_id, data_pagamento, valor_centavos, forma
              _texto(observacao), quem, regras.agora()),
         )
         pagamento_id = cur.lastrowid
-        _auditar(con, quem, "registrar_pagamento", "pagamento", pagamento_id, cobranca_id=cobranca_id,
+        auditar(con, quem, "registrar_pagamento", "pagamento", pagamento_id, cobranca_id=cobranca_id,
                  valor_centavos=valor, data_pagamento=data.isoformat(), forma=forma,
                  identificador_externo=identificador_externo)
         rotulo = _rotulo_cobranca(con, cobranca)
@@ -713,7 +703,7 @@ def cancelar_pagamento(quem, pagamento_id, motivo):
             raise ErroDeNegocio("Esse pagamento já está cancelado.")
         con.execute("UPDATE pagamentos SET cancelado_em = ?, motivo_cancelamento = ? WHERE id = ?",
                     (regras.agora(), motivo, pagamento_id))
-        _auditar(con, quem, "cancelar_pagamento", "pagamento", pagamento_id, motivo=motivo)
+        auditar(con, quem, "cancelar_pagamento", "pagamento", pagamento_id, motivo=motivo)
 
 
 # --- PENDÊNCIAS ---
@@ -731,91 +721,7 @@ def resolver_pendencia(quem, pendencia_id, resolucao):
             raise ErroDeNegocio("Essa pendência já foi resolvida.")
         con.execute("UPDATE pendencias SET resolvida_em = ?, resolvida_por = ?, resolucao = ? WHERE id = ?",
                     (regras.agora(), quem, resolucao, pendencia_id))
-        _auditar(con, quem, "resolver_pendencia", "pendencia", pendencia_id, resolucao=resolucao)
-
-
-# --- DOCUMENTOS ---
-def _caminho_relativo(caminho, exigir_arquivo):
-    """Normaliza um caminho relativo à pasta de documentos e recusa o que sai dela."""
-    texto = _obrigatorio(caminho, "caminho do arquivo").replace("\\", "/")
-    raiz = Path(config.DOCS_DIR).resolve()
-    # Aceita caminho absoluto se estiver dentro da pasta de documentos.
-    if texto.startswith("/"):
-        try:
-            texto = Path(texto).resolve().relative_to(raiz).as_posix()
-        except ValueError:
-            raise ErroDeNegocio(f"O arquivo precisa estar dentro da pasta de documentos: '{caminho}'.") from None
-    relativo = PurePosixPath(texto)
-    if ".." in relativo.parts:
-        raise ErroDeNegocio(f"Caminho inválido: '{caminho}'.")
-    relativo = relativo.as_posix().removeprefix("./")
-    if exigir_arquivo and not (raiz / relativo).is_file():
-        raise ErroDeNegocio(f"Arquivo não encontrado na pasta de documentos: '{relativo}'.")
-    return relativo
-
-
-def caminho_absoluto(relativo):
-    return Path(config.DOCS_DIR).resolve() / _caminho_relativo(relativo, exigir_arquivo=False)
-
-
-def pasta_documento(entidade, entidade_id):
-    """Pasta (relativa à pasta de documentos) onde guardar os arquivos de um imóvel, locatário ou contrato."""
-    if entidade not in ENTIDADES_DOCUMENTO:
-        raise ErroDeNegocio(f"Entidade inválida: '{entidade}'. Use: {', '.join(ENTIDADES_DOCUMENTO)}.")
-    with db.leitura() as con:
-        if entidade == "locatario":
-            loc = _obter(con, "locatarios", entidade_id, "Locatário")
-            return f"locatarios/{regras.nome_pasta(loc['cpf_cnpj'] + ' - ' + loc['nome'])}"
-        if entidade == "imovel":
-            imovel = _obter(con, "imoveis", entidade_id, "Imóvel")
-            return f"imoveis/{regras.nome_pasta(imovel['grupo'] + ' - ' + imovel['unidade'])}/imovel"
-        contrato = _obter(con, "contratos", entidade_id, "Contrato")
-        imovel = _obter(con, "imoveis", contrato["imovel_id"], "Imóvel")
-        loc = _obter(con, "locatarios", contrato["locatario_id"], "Locatário")
-        return (f"imoveis/{regras.nome_pasta(imovel['grupo'] + ' - ' + imovel['unidade'])}/contratos/"
-                f"{regras.nome_pasta(contrato['data_inicio'][:7] + ' - ' + loc['nome'])}")
-
-
-def registrar_documento(quem, entidade, entidade_id, tipo, caminho, descricao=None):
-    """Liga um arquivo que já está na pasta de documentos a um imóvel, locatário ou contrato."""
-    pasta_documento(entidade, entidade_id)  # valida entidade e id
-    relativo = _caminho_relativo(caminho, exigir_arquivo=True)
-    tipo = _obrigatorio(tipo, "tipo do documento")
-    with db.transacao() as con:
-        existente = con.execute("SELECT id FROM documentos WHERE caminho = ?", (relativo,)).fetchone()
-        if existente:
-            return existente["id"]
-        cur = con.execute(
-            "INSERT INTO documentos (entidade, entidade_id, tipo, caminho, descricao, registrado_por, registrado_em) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (entidade, entidade_id, tipo, relativo, _texto(descricao), quem, regras.agora()),
-        )
-        _auditar(con, quem, "registrar_documento", entidade, entidade_id, documento_id=cur.lastrowid,
-                 tipo=tipo, caminho=relativo)
-        return cur.lastrowid
-
-
-def salvar_documento(quem, entidade, entidade_id, tipo, nome_arquivo, conteudo, descricao=None, nome_base=None):
-    """Upload pela web: grava o arquivo na pasta certa e registra. nome_base troca o nome sugerido."""
-    tipo = _obrigatorio(tipo, "tipo do documento")
-    pasta = pasta_documento(entidade, entidade_id)
-    original = Path(_obrigatorio(nome_arquivo, "arquivo"))
-    extensao = original.suffix.lower()
-    if nome_base:
-        base = regras.nome_pasta(nome_base)
-    elif tipo in NOMES_FIXOS:
-        base = tipo
-    elif tipo == "aditivo":
-        base = f"aditivo-{regras.competencia_de(regras.hoje())}"
-    else:
-        base = regras.nome_pasta(original.stem).replace(" ", "-").lower() or tipo
-    destino_pasta = Path(config.DOCS_DIR) / pasta
-    destino_pasta.mkdir(parents=True, exist_ok=True)
-    nome, n = f"{base}{extensao}", 2
-    while (destino_pasta / nome).exists():
-        nome, n = f"{base}-{n}{extensao}", n + 1
-    (destino_pasta / nome).write_bytes(conteudo)
-    return registrar_documento(quem, entidade, entidade_id, tipo, f"{pasta}/{nome}", descricao)
+        auditar(con, quem, "resolver_pendencia", "pendencia", pendencia_id, resolucao=resolucao)
 
 
 # --- USUÁRIOS ---
@@ -829,7 +735,7 @@ def criar_usuario(login, nome, senha, quem="sistema"):
         with db.transacao() as con:
             cur = con.execute("INSERT INTO usuarios (login, nome, senha_hash) VALUES (?, ?, ?)",
                               (login, nome, senha_hash))
-            _auditar(con, quem, "criar_usuario", "usuario", cur.lastrowid, login=login, nome=nome)
+            auditar(con, quem, "criar_usuario", "usuario", cur.lastrowid, login=login, nome=nome)
             return cur.lastrowid
     except sqlite3.IntegrityError:
         raise ErroDeNegocio(f"Já existe o usuário '{login}'.") from None
@@ -843,7 +749,7 @@ def alterar_senha(quem, login, senha_nova):
         cur = con.execute("UPDATE usuarios SET senha_hash = ? WHERE login = ?", (senha_hash, login.lower()))
         if not cur.rowcount:
             raise ErroDeNegocio(f"Usuário '{login}' não encontrado.")
-        _auditar(con, quem, "alterar_senha", "usuario", None, login=login)
+        auditar(con, quem, "alterar_senha", "usuario", None, login=login)
 
 
 def autenticar(login, senha):

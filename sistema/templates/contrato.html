@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import selo, documentos, dinheiro %}
+{% from "_macros.html" import selo, dinheiro %}
 {% block conteudo %}
 <h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
 <p><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · {{ c.locatario_telefone }}{% endif %}</p>
@@ -21,7 +21,7 @@
 <div class="acoes"><a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a></div>
 {% if c.status == "ativo" %}
 <details class="acao"><summary>Registrar reajuste</summary>
-  {% if c.indice_reajuste %}<p><a role="button" class="outline" href="/contratos/{{ c.id }}/reajuste">Calcular pelo {{ c.indice_reajuste }} (últimos 12 meses)</a></p>{% endif %}
+  {% if c.indice_reajuste and modulo_ativo("reajuste") %}<p><a role="button" class="outline" href="/contratos/{{ c.id }}/reajuste">Calcular pelo {{ c.indice_reajuste }} (últimos 12 meses)</a></p>{% endif %}
   <form method="post" action="/contratos/{{ c.id }}/reajuste">
     {{ dinheiro("novo_valor", "Novo valor", {}, obrigatorio=True) }}
     <label>Vale a partir de * <input type="date" name="vigente_desde" required></label>
@@ -63,7 +63,7 @@
 <h3>Histórico de valores</h3>
 <ul>{% for v in c.valores %}<li>{{ v.valor }} desde {{ v.vigente_desde|data }} ({{ v.motivo }})</li>{% endfor %}</ul>
 
-{{ documentos(c.documentos, "contrato", c.id, "/contratos/" ~ c.id) }}
+{% if modulo_ativo("documentos") %}{% with entidade="contrato", entidade_id=c.id, voltar="/contratos/" ~ c.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 
 <form method="post" action="/contratos/{{ c.id }}/apagar" onsubmit="return confirm('Apagar este contrato? Só funciona se foi cadastrado por engano, sem pagamentos.')">
   <button type="submit" class="secondary outline">Apagar contrato (cadastrado por engano)</button>

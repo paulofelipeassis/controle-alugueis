@@ -1,13 +1,14 @@
 """Conexão com o SQLite.
 
 Cada operação abre a própria conexão (barato no SQLite) e fecha no fim. O
-schema é aplicado automaticamente na primeira conexão de cada arquivo.
+schema (núcleo + módulos opcionais) é aplicado automaticamente na primeira conexão
+de cada arquivo.
 """
 import contextlib
 import sqlite3
 from pathlib import Path
 
-from sistema import config
+from sistema import config, modulos
 
 _SCHEMA = Path(__file__).with_name("schema.sql")
 _inicializados = set()
@@ -25,6 +26,8 @@ def conectar():
     con.execute("PRAGMA journal_mode = WAL")
     if caminho not in _inicializados:
         con.executescript(_SCHEMA.read_text(encoding="utf-8"))
+        for schema in modulos.schemas():  # tabelas dos módulos opcionais
+            con.executescript(schema.read_text(encoding="utf-8"))
         _inicializados.add(caminho)
     return con
 

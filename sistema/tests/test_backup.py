@@ -1,7 +1,7 @@
 import sqlite3
 import tarfile
 
-from sistema import config, servicos
+from sistema import arquivos, config
 from scripts import backup
 
 
@@ -9,7 +9,7 @@ def test_backup_contem_banco_e_documentos(tmp_path, monkeypatch, cenario):
     monkeypatch.setattr(config, "BACKUP_DIR", str(tmp_path / "backups"))
     monkeypatch.setattr(config, "RCLONE_DESTINO", "")
     monkeypatch.setattr(config, "BACKUP_MANTER", 2)
-    servicos.salvar_documento("t", "contrato", cenario["contrato"], "contrato-assinado", "c.pdf", b"%PDF")
+    arquivos.salvar(arquivos.pasta("contrato", cenario["contrato"]), "contrato-assinado", ".pdf", b"%PDF")
     arquivo = backup.fazer_backup()
     with tarfile.open(arquivo) as tar:
         nomes = tar.getnames()

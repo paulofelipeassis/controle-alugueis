@@ -15,6 +15,11 @@ começar qualquer etapa.**
 | 6 — Virada | ⏳ Depende do Paulo (domínio, uso em paralelo, desligar o Streamlit) |
 | Extra — reajuste | ✅ Sugestão de reajuste por IPCA/IGP-M calculada na hora (módulo `sistema/reajuste.py`), cobrança marcada até o reajuste ser registrado, e data do valor atual no cadastro de contratos antigos (regras §4) |
 
+Estrutura modular (pedido do Paulo, 27/09/2026): o núcleo fica em `sistema/*.py`, e as funções
+opcionais ficam em `sistema/modulos/<nome>/`: hoje `documentos` e `reajuste`. Apagar a pasta de
+um módulo remove a função sem quebrar o resto (testado). Os caminhos de arquivo citados nas
+etapas abaixo são do plano original; o `CLAUDE.md` descreve a estrutura atual.
+
 Diferenças em relação ao plano abaixo, e por quê:
 - Tudo foi feito numa branch só, e não uma por etapa, porque o Paulo pediu para seguir até o
   fim sem parar entre as etapas.

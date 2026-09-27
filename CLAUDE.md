@@ -27,24 +27,33 @@ New system commands (from the repo root):
 
 ```bash
 pip install -r sistema/requirements.txt
-python -m pytest sistema/tests -q              # all tests (uses temp DBs)
+python -m pytest sistema -q                    # all tests, core + modules (uses temp DBs)
 uvicorn sistema.web:app --reload               # web pages on :8000
 MCP_TOKEN=x python -m sistema.mcp_server       # MCP on :8001/mcp
 python -m scripts.demo                         # prints a sample dashboard
 python -m scripts.criar_usuario                # creates a login
 ```
 
-New system architecture: `servicos.py` is the **only** writer (every write audited, raises
-`ErroDeNegocio` with a Portuguese message); `consultas.py` has all reads/reports;
-`regras.py` holds pure date/money/status rules; `web.py` and `mcp_server.py` only translate
-parameters and call those two. Money is integer centavos, dates ISO text, statuses are
+New system architecture: `servicos.py` is the **only** core writer (every write audited via
+`servicos.auditar`, raises `ErroDeNegocio` with a Portuguese message); `consultas.py` has all
+core reads/reports; `regras.py` holds pure date/money/status rules; `arquivos.py` owns the
+shared documents folder and its path convention; `web.py` (+ helpers/templates in
+`web_comum.py`) and `mcp_server.py` only translate parameters and call those.
+
+Optional features live in `sistema/modulos/<nome>/` (today: `documentos`, `reajuste`) and are
+discovered automatically by `sistema/modulos/__init__.py`: optional `schema.sql`, `web.py`
+(`router`), `mcp.py` (`registrar(mcp)`), `templates/<nome>/`, and their own `test_*.py`.
+Deleting a module folder removes the feature and the rest keeps working (verified by running
+the suite with each module deleted). Core code never imports a module by name; core templates
+use `{% if modulo_ativo("nome") %}`; module tables use `ON DELETE CASCADE` so core deletes
+don't need to know about them. Money is integer centavos, dates ISO text, statuses are
 computed, never stored. `config.py` values are read as `config.X` at call time so tests can
 monkeypatch them.
 
-Keep the core small and optional features removable (Paulo's rule: "não criar um
-Frankenstein"). The core is cadastros → contratos → cobranças → pagamentos (+ pendências,
-auditoria). An optional feature lives in its own module that imports the core, never the
-other way round, and its docstring says how to remove it (example: `sistema/reajuste.py`).
+Keep the core small and optional features removable (Paulo's rule: "modularize sempre que
+possível", "não criar um Frankenstein"). The core is cadastros → contratos → cobranças
+(with boletos) → pagamentos (+ pendências, auditoria, usuários). Any new feature that the
+core doesn't strictly need goes in a new `sistema/modulos/<nome>/` folder.
 Don't add tables or scheduled jobs for things that can be computed on demand, and don't
 build features "just in case" — the schema is what's hard to change once real data exists.
 

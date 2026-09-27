@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import selo, documentos %}
+{% from "_macros.html" import selo %}
 {% block conteudo %}
 <h2>{{ i.nome }} {{ selo(i.situacao) }}</h2>
 <p>{{ i.endereco }}</p>
@@ -23,7 +23,7 @@
   {% else %}<tr><td colspan="4">Nenhum contrato.</td></tr>{% endfor %}
   </tbody>
 </table></div>
-{{ documentos(i.documentos, "imovel", i.id, "/imoveis/" ~ i.id) }}
+{% if modulo_ativo("documentos") %}{% with entidade="imovel", entidade_id=i.id, voltar="/imoveis/" ~ i.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 {% if not i.contratos %}
 <form method="post" action="/imoveis/{{ i.id }}/apagar" onsubmit="return confirm('Apagar este imóvel?')">
   <button type="submit" class="secondary outline">Apagar imóvel</button>
