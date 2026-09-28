@@ -5,13 +5,13 @@ sufixo (ex.: `valor_centavos: 123456` e `valor: "R$ 1.234,56"`).
 """
 from datetime import timedelta
 
-from sistema import db, regras, servicos
+from sistema import db, modulos, regras, servicos
 from sistema.regras import ErroDeNegocio, maiuscula, para_data
 
 ROTULOS_SITUACAO = {
     "paga": "Paga", "parcial": "Parcial", "em_aberto": "Em aberto", "atrasada": "Atrasada",
     "isenta": "Isenta", "cancelada": "Cancelada",
-    "alugado": "Alugado", "vago": "Vago", "em_manutencao": "Em manutenção",
+    "alugado": "Alugado", "vago": "Vago", "em_manutencao": "Em manutenção", "reservado": "Reservado",
     "ativo": "Ativo", "encerrado": "Encerrado",
 }
 
@@ -50,10 +50,13 @@ def obter(entidade, entidade_id):
 
 
 # --- CADASTROS ---
-def listar_imoveis(situacao=None):
+def listar_imoveis(situacao=None, hoje=None):
+    """situacao: 'alugado', 'reservado' (contrato ainda não começou), 'vago' ou 'em_manutencao'."""
+    hoje = _hoje(hoje)
     with db.leitura() as con:
         linhas = con.execute(
-            "SELECT i.*, c.id AS contrato_id, l.id AS locatario_id, l.nome AS locatario_nome "
+            "SELECT i.*, c.id AS contrato_id, c.data_inicio AS contrato_inicio, "
+            "l.id AS locatario_id, l.nome AS locatario_nome "
             "FROM imoveis i LEFT JOIN contratos c ON c.imovel_id = i.id AND c.data_encerramento IS NULL "
             "LEFT JOIN locatarios l ON l.id = c.locatario_id ORDER BY i.grupo, i.unidade"
         ).fetchall()
@@ -61,7 +64,9 @@ def listar_imoveis(situacao=None):
     for linha in linhas:
         imovel = _com_reais(dict(linha))
         imovel["nome"] = _imovel_nome(linha)
-        imovel["situacao"] = regras.situacao_imovel(linha["contrato_id"] is not None, linha["em_manutencao"])
+        imovel["situacao"] = regras.situacao_imovel(
+            linha["contrato_id"] is not None, linha["em_manutencao"],
+            linha["contrato_id"] is not None and linha["contrato_inicio"] > hoje.isoformat())
         imovel["situacao_texto"] = ROTULOS_SITUACAO[imovel["situacao"]]
         if situacao is None or imovel["situacao"] == situacao:
             imoveis.append(imovel)
@@ -172,6 +177,7 @@ def _cobranca(linha, hoje):
     # o boleto não deve sair com o valor antigo.
     cobranca["reajuste_pendente"] = bool(
         linha["situacao"] == "normal" and saldo > 0 and linha["indice_reajuste"] and linha["ultimo_valor_desde"]
+        and not linha["data_encerramento"]
         and contratual >= regras.proximo_aniversario(para_data(linha["ultimo_valor_desde"])))
     if cobranca["situacao_calculada"] == "atrasada":
         multa, juros = regras.encargos(saldo, linha["multa_pct"], linha["juros_mes_pct"], venc, hoje)
@@ -261,7 +267,7 @@ def resumo_do_mes(competencia=None, hoje=None):
 # --- FICHAS E EXTRATO ---
 def ficha_imovel(imovel_id, hoje=None):
     hoje = _hoje(hoje)
-    imovel = next((i for i in listar_imoveis() if i["id"] == int(imovel_id)), None)
+    imovel = next((i for i in listar_imoveis(hoje=hoje) if i["id"] == int(imovel_id)), None)
     if imovel is None:
         raise ErroDeNegocio(f"Imóvel {imovel_id} não encontrado.")
     with db.leitura() as con:
@@ -345,7 +351,7 @@ def alertas(hoje=None):
             lista.append({"tipo": "boleto_nao_enviado", "contrato_id": cb["contrato_id"], "cobranca_id": cb["id"],
                           "mensagem": f"{cb['imovel_nome']} ({cb['locatario_nome']}): boleto de {cb['competencia']} "
                                       "emitido e ainda não enviado."})
-    return lista
+    return lista + modulos.alertas(hoje)  # avisos dos módulos opcionais
 
 
 def recebido_por_mes(meses=12, hoje=None):
@@ -361,8 +367,9 @@ def recebido_por_mes(meses=12, hoje=None):
 
 def painel(hoje=None):
     hoje = _hoje(hoje)
-    imoveis = listar_imoveis()
-    contagem = {s: sum(1 for i in imoveis if i["situacao"] == s) for s in ("alugado", "vago", "em_manutencao")}
+    imoveis = listar_imoveis(hoje=hoje)
+    contagem = {s: sum(1 for i in imoveis if i["situacao"] == s)
+                for s in ("alugado", "reservado", "vago", "em_manutencao")}
     lista_inadimplentes = inadimplentes(hoje)
     with db.leitura() as con:
         pendencias = con.execute("SELECT COUNT(*) FROM pendencias WHERE resolvida_em IS NULL").fetchone()[0]
@@ -370,6 +377,7 @@ def painel(hoje=None):
         "data": hoje.isoformat(),
         "imoveis_total": len(imoveis),
         "imoveis_alugados": contagem["alugado"],
+        "imoveis_reservados": contagem["reservado"],
         "imoveis_vagos": contagem["vago"],
         "imoveis_em_manutencao": contagem["em_manutencao"],
         "ocupacao_pct": round(100 * contagem["alugado"] / len(imoveis)) if imoveis else 0,
@@ -411,7 +419,8 @@ def historico_pagamentos(data_de=None, data_ate=None, grupo=None, imovel_id=None
     where = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
     with db.leitura() as con:
         pagamentos = _dicts(con.execute(
-            "SELECT p.*, cb.competencia, cb.contrato_id, i.grupo, i.unidade, l.nome AS locatario_nome "
+            "SELECT p.*, cb.competencia, cb.contrato_id, i.id AS imovel_id, i.grupo, i.unidade, "
+            "l.id AS locatario_id, l.nome AS locatario_nome, l.cpf_cnpj AS locatario_cpf_cnpj "
             "FROM pagamentos p JOIN cobrancas cb ON cb.id = p.cobranca_id JOIN contratos c ON c.id = cb.contrato_id "
             "JOIN imoveis i ON i.id = c.imovel_id JOIN locatarios l ON l.id = c.locatario_id "
             f"{where} ORDER BY p.data_pagamento DESC, p.id DESC", tuple(params)))

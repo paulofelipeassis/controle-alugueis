@@ -5,6 +5,7 @@ Cada subpasta é um módulo e pode ter:
   schema.sql    tabelas próprias (aplicadas junto com as do núcleo)
   web.py        `router` (APIRouter) com as páginas do módulo
   mcp.py        `registrar(mcp)` com as ferramentas do Hermes
+  alertas.py    `alertas(hoje)` -> lista de avisos para o painel e para o Hermes
   templates/    páginas HTML (em templates/<nome_do_modulo>/...)
   test_*.py     testes do módulo
 
@@ -13,6 +14,7 @@ páginas do núcleo, um pedaço de um módulo aparece com
 `{% if modulo_ativo("nome") %}...{% endif %}`, então apagar a pasta não quebra nada.
 """
 import importlib
+import logging
 import pkgutil
 from pathlib import Path
 
@@ -32,6 +34,24 @@ def carregar(nome, parte):
         if erro.name == caminho:
             return None
         raise
+
+
+def alertas(hoje):
+    """Avisos de todos os módulos, no mesmo formato dos avisos do núcleo: {'tipo', 'contrato_id', 'mensagem'}.
+    Um módulo com defeito não derruba o painel: vira um aviso dizendo qual módulo falhou."""
+    lista = []
+    for nome in nomes():
+        modulo = carregar(nome, "alertas")
+        if modulo is None:
+            continue
+        try:
+            lista += modulo.alertas(hoje)
+        except Exception:  # noqa: BLE001 — módulo opcional nunca pode quebrar o núcleo
+            logging.getLogger("controle_alugueis").exception("Falha nos avisos do módulo '%s'", nome)
+            lista.append({"tipo": "erro_de_modulo", "contrato_id": None,
+                          "mensagem": f"O módulo '{nome}' falhou ao montar os avisos dele (o resto do sistema segue "
+                                      "normal). Avise quem cuida do sistema."})
+    return lista
 
 
 def schemas():

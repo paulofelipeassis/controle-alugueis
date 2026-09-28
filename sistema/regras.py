@@ -64,6 +64,11 @@ def competencia_de(data):
     return f"{data.year:04d}-{data.month:02d}"
 
 
+def dias_do_mes(competencia):
+    ano, mes = map(int, competencia.split("-"))
+    return calendar.monthrange(ano, mes)[1]
+
+
 def proxima_competencia(competencia):
     ano, mes = map(int, competencia.split("-"))
     return competencia_de(somar_meses(date(ano, mes, 1), 1))
@@ -152,6 +157,12 @@ def reais_para_centavos(valor, campo="valor"):
     return int((reais * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def valor_proporcional(valor_centavos, dias, dias_no_mes):
+    """Aluguel proporcional aos dias usados do mês (dias corridos, do mês civil), em centavos."""
+    dias = max(0, min(int(dias), int(dias_no_mes)))
+    return int((Decimal(int(valor_centavos)) * dias / int(dias_no_mes)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def formatar_reais(centavos):
     if centavos is None:
         return ""
@@ -221,9 +232,10 @@ def situacao_cobranca(situacao, valor, pago, vencimento_, hoje_):
     return "em_aberto"
 
 
-def situacao_imovel(tem_contrato_ativo, em_manutencao):
+def situacao_imovel(tem_contrato_ativo, em_manutencao, inicio_no_futuro=False):
+    """'reservado' = tem contrato ativo que ainda não começou (o imóvel segue vago até a data de início)."""
     if tem_contrato_ativo:
-        return "alugado"
+        return "reservado" if inicio_no_futuro else "alugado"
     return "em_manutencao" if em_manutencao else "vago"
 
 

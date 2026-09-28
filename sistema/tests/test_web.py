@@ -82,7 +82,8 @@ def test_acoes_do_contrato_e_cobranca(cliente):
     assert "Pendência criada" in r.text and "Isenta" in r.text
     r = cliente.post(f"/contratos/{contrato}/reajuste", data={"novo_valor": "1.600,00", "vigente_desde": "2026-01-01"})
     assert "precisa valer a partir" in r.text
-    r = cliente.post(f"/contratos/{contrato}/encerrar", data={"data_encerramento": "2026-10-31", "motivo": "saída"})
+    r = cliente.post(f"/contratos/{contrato}/encerrar", data={"data_encerramento": "2026-10-31", "motivo": "saída",
+                                                               "cobrar_ate_a_saida": "nao"})
     assert "Contrato encerrado" in r.text
     pendencia = consultas.listar_pendencias()[0]["id"]
     r = cliente.post(f"/pendencias/{pendencia}/resolver", data={"resolucao": "boleto cancelado na Caixa"})
@@ -100,3 +101,17 @@ def test_trocar_senha(cliente):
     assert servicos.autenticar("paulo", "nova-senha-1")
 
 
+
+
+def test_encerrar_exige_escolher_como_o_contrato_cobra(cliente):
+    imovel = servicos.cadastrar_imovel("t", "G", "U", "E")
+    loc = servicos.cadastrar_locatario("t", "N", "12345678900", "n@x.com")
+    contrato = servicos.criar_contrato("t", imovel, loc, "2026-10-05", "2027-10-04", 10, 150000)
+    r = cliente.post(f"/contratos/{contrato}/encerrar", data={"data_encerramento": "2026-11-15", "motivo": "saiu"})
+    assert "Escolha como o contrato cobra o aluguel" in r.text
+    assert consultas.extrato_contrato(contrato)["status"] == "ativo"  # nada foi encerrado
+    r = cliente.post(f"/contratos/{contrato}/encerrar", data={
+        "data_encerramento": "2026-11-15", "motivo": "saiu", "cobrar_ate_a_saida": "sim"})
+    assert "Última cobrança: 12/2026, R$ 750,00 (15 de 30 dias até a saída)" in r.text
+    assert "última cobrança (até a saída): 15 de 30 dias" in cliente.get(
+        f"/cobrancas/{consultas.listar_cobrancas(competencia='2026-12', contrato_id=contrato, hoje='2026-11-20')[0]['id']}").text

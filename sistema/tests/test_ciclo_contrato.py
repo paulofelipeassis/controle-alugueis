@@ -52,7 +52,7 @@ def test_reabrir_contrato_encerrado_por_engano(cenario):
     r = servicos.reabrir_contrato("paulo", cenario["contrato"], "encerrado com o contrato errado")
     assert r["cobrancas_restauradas"] == 3
     assert [p["tipo"] for p in r["pendencias"]] == ["reemitir_boleto"]
-    assert consultas.listar_imoveis()[0]["situacao"] == "alugado"
+    assert consultas.listar_imoveis(hoje="2026-10-10")[0]["situacao"] == "alugado"
     cobrancas = _cobrancas(cenario["contrato"])
     assert cobrancas["2026-12"]["situacao"] == "normal" and cobrancas["2027-01"]["situacao"] == "normal"
     with db.leitura() as con:

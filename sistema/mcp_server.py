@@ -64,7 +64,8 @@ def alertas() -> dict:
 @mcp.tool()
 def listar_imoveis(situacao: str | None = None) -> dict:
     """Lista os imóveis com situação calculada e locatário atual.
-    situacao (opcional): 'alugado', 'vago' ou 'em_manutencao'."""
+    situacao (opcional): 'alugado', 'reservado' (contrato ativo que ainda não começou), 'vago' ou
+    'em_manutencao'."""
     return _lista(consultas.listar_imoveis(situacao))
 
 
@@ -242,11 +243,15 @@ def renovar_contrato(contrato_id: int, nova_data_fim: str, novo_valor: str | Non
 
 
 @mcp.tool()
-def encerrar_contrato(contrato_id: int, data_encerramento: str, motivo: str) -> dict:
+def encerrar_contrato(contrato_id: int, data_encerramento: str, motivo: str, cobrar_ate_a_saida: bool) -> dict:
     """Encerra um contrato (AAAA-MM-DD). Cobranças que vencem depois e não foram pagas são
     canceladas; se alguma tinha boleto, é criada pendência para cancelar no banco. Dívidas
-    anteriores continuam em aberto."""
-    return servicos.encerrar_contrato(HERMES, contrato_id, data_encerramento, motivo)
+    anteriores continuam em aberto.
+    PERGUNTE ao Paulo antes: este contrato cobra o aluguel DEPOIS do uso (o aluguel de março vence em
+    abril)? Se sim, use cobrar_ate_a_saida=true: a cobrança do mês seguinte à saída é mantida com o
+    valor proporcional aos dias usados (a resposta traz 'ultima_cobranca'). Se o aluguel é pago no
+    próprio mês ou adiantado, use false: nada é cobrado depois da saída."""
+    return servicos.encerrar_contrato(HERMES, contrato_id, data_encerramento, motivo, cobrar_ate_a_saida)
 
 
 # ============ BOLETOS E PAGAMENTOS ============

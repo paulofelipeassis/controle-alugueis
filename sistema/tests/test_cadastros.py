@@ -36,7 +36,7 @@ def test_um_contrato_ativo_por_imovel(cenario):
 
 
 def test_situacao_do_imovel_e_calculada(cenario):
-    assert consultas.listar_imoveis()[0]["situacao"] == "alugado"
+    assert consultas.listar_imoveis(hoje="2026-10-10")[0]["situacao"] == "alugado"
     servicos.encerrar_contrato("t", cenario["contrato"], "2026-10-31", "saída")
     assert consultas.listar_imoveis()[0]["situacao"] == "vago"
     servicos.atualizar_imovel("t", cenario["imovel"], em_manutencao=True)
@@ -117,3 +117,25 @@ def test_script_cria_usuario_e_troca_senha(monkeypatch):
     respostas = iter(["ana", "n"])  # desiste: nada muda
     criar_usuario.main()
     assert servicos.autenticar("ana", "senha-nova-99")
+
+
+def test_imovel_com_contrato_que_ainda_nao_comecou_e_reservado(cenario):
+    # O contrato do cenário começa em 05/10/2026; a data fixa dos testes é 27/09/2026.
+    imovel = consultas.listar_imoveis(hoje="2026-09-27")[0]
+    assert imovel["situacao"] == "reservado" and imovel["situacao_texto"] == "Reservado"
+    assert consultas.listar_imoveis("alugado", hoje="2026-09-27") == []
+    assert len(consultas.listar_imoveis("reservado", hoje="2026-09-27")) == 1
+    # Na data de início e depois, passa a alugado.
+    assert consultas.listar_imoveis(hoje="2026-10-05")[0]["situacao"] == "alugado"
+    assert consultas.listar_imoveis(hoje="2027-03-01")[0]["situacao"] == "alugado"
+
+    painel = consultas.painel(hoje="2026-09-27")
+    assert (painel["imoveis_alugados"], painel["imoveis_reservados"], painel["ocupacao_pct"]) == (0, 1, 0)
+    assert consultas.painel(hoje="2026-10-06")["ocupacao_pct"] == 100
+    assert consultas.ficha_imovel(cenario["imovel"], hoje="2026-09-27")["situacao"] == "reservado"
+
+
+def test_reservado_nao_aceita_outro_contrato(cenario):
+    outro = servicos.cadastrar_locatario("t", "João", "98765432100", "j@x.com")
+    with pytest.raises(ErroDeNegocio, match="já tem um contrato ativo"):
+        servicos.criar_contrato("t", cenario["imovel"], outro, "2026-11-01", "2027-11-01", 5, 100000)

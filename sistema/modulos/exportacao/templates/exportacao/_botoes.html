@@ -1,0 +1,12 @@
+{# Botões de planilha, no fim do histórico financeiro. Espera: filtros (os filtros atuais da página). #}
+<h3>Planilha</h3>
+<div class="acoes">
+  <a role="button" class="outline" href="/exportar/pagamentos.csv?{{ filtros|urlencode }}">Baixar estes pagamentos</a>
+</div>
+<form method="get" action="/exportar/recebimentos.csv" class="grid">
+  <label>Recebimentos do ano, por locatário e imóvel
+    <input type="number" name="ano" min="2000" max="2100" value="{{ hoje_ano }}" required>
+  </label>
+  <label>&nbsp;<button type="submit" class="outline">Baixar planilha do ano</button></label>
+</form>
+<p><small>Abre no Excel e no Google Planilhas. Os totais do ano contam pela data em que o dinheiro entrou (com multa e juros, quando houve). Para o imposto de renda, confirme o que declarar com o seu contador.</small></p>

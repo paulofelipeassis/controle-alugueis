@@ -3,6 +3,7 @@
 {% block conteudo %}
 <h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
 <p><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · {{ c.locatario_telefone }}{% endif %}</p>
+{% if modulo_ativo("proporcional") %}{% include "proporcional/_bloco.html" %}{% endif %}
 {% if c.prazo_vencido %}<div class="msg aviso">O prazo terminou em {{ c.data_fim_prevista|data }}. O contrato continua valendo e gerando cobranças até ser renovado ou encerrado.</div>{% endif %}
 <ul>
   <li>Aluguel atual: <strong>{{ c.valor_atual }}</strong> (desde {{ c.valor_atual_desde|data }}), vence todo dia {{ c.dia_vencimento }}</li>
@@ -50,7 +51,14 @@
   <form method="post" action="/contratos/{{ c.id }}/encerrar" onsubmit="return confirm('Encerrar este contrato?')">
     <label>Data de encerramento * <input type="date" name="data_encerramento" required></label>
     <label>Motivo * <input type="text" name="motivo" required></label>
-    <small>Cobranças que vencem depois dessa data e não foram pagas serão canceladas.</small>
+    <fieldset>
+      <legend>Como este contrato cobra o aluguel? *</legend>
+      <label><input type="radio" name="cobrar_ate_a_saida" value="sim" required>
+        <strong>Depois de usar o imóvel</strong> (o aluguel de março vence em abril). Cobrar os dias até a saída, no próximo vencimento.</label>
+      <label><input type="radio" name="cobrar_ate_a_saida" value="nao" required>
+        <strong>No próprio mês ou adiantado</strong> (o aluguel de março vence em março). Não cobrar nada depois da saída.</label>
+      <small>Isso decide o que acontece com a cobrança que vence depois da saída. As outras cobranças futuras, sem pagamento, são canceladas. Dívidas anteriores continuam em aberto.</small>
+    </fieldset>
     <button type="submit" class="secondary">Encerrar contrato</button>
   </form>
 </details>
@@ -72,6 +80,7 @@
 <h3>Histórico de valores</h3>
 <ul>{% for v in c.valores %}<li>{{ v.valor }} desde {{ v.vigente_desde|data }} ({{ v.motivo }})</li>{% endfor %}</ul>
 
+{% if modulo_ativo("caucao") %}{% include "caucao/_bloco.html" %}{% endif %}
 {% if modulo_ativo("documentos") %}{% with entidade="contrato", entidade_id=c.id, voltar="/contratos/" ~ c.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 
 <form method="post" action="/contratos/{{ c.id }}/apagar" onsubmit="return confirm('Apagar este contrato? Só funciona se foi cadastrado por engano, sem pagamentos.')">

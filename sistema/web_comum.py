@@ -86,7 +86,7 @@ def acao(request, voltar, funcao, sucesso):
     """Executa uma ação de botão e volta para a página com mensagem de sucesso ou de erro."""
     try:
         resultado = funcao()
-        avisar(request, sucesso)
+        avisar(request, sucesso(resultado) if callable(sucesso) else sucesso)
         if isinstance(resultado, dict):
             for pendencia in resultado.get("pendencias", []):
                 avisar(request, f"Pendência criada: {pendencia['descricao']}", "aviso")

@@ -26,4 +26,5 @@
   </tbody>
 </table></div>
 <p><small>Para cancelar um pagamento, abra a cobrança (coluna Mês).</small></p>
+{% if modulo_ativo("exportacao") %}{% include "exportacao/_botoes.html" %}{% endif %}
 {% endblock %}

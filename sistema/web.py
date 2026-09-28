@@ -319,7 +319,7 @@ def corretor_apagar(request: Request, corretor_id: int):
 
 # --- CONTRATOS ---
 def _opcoes_contrato():
-    return {"imoveis": [i for i in consultas.listar_imoveis() if i["situacao"] != "alugado"],
+    return {"imoveis": [i for i in consultas.listar_imoveis() if i["situacao"] not in ("alugado", "reservado")],
             "locatarios": consultas.listar_locatarios(), "corretores": consultas.listar_corretores()}
 
 
@@ -413,8 +413,22 @@ async def contrato_renovar(request: Request, contrato_id: int):
 @app.post("/contratos/{contrato_id}/encerrar")
 async def contrato_encerrar(request: Request, contrato_id: int):
     form = await ler_form(request)
-    return acao(request, f"/contratos/{contrato_id}", lambda: servicos.encerrar_contrato(
-        quem(request), contrato_id, form.get("data_encerramento"), form.get("motivo")), "Contrato encerrado.")
+
+    def encerrar():
+        escolha = form.get("cobrar_ate_a_saida")
+        if escolha not in ("sim", "nao"):
+            raise ErroDeNegocio("Escolha como o contrato cobra o aluguel: depois do uso, ou no próprio mês/adiantado.")
+        return servicos.encerrar_contrato(quem(request), contrato_id, form.get("data_encerramento"),
+                                          form.get("motivo"), cobrar_ate_a_saida=escolha == "sim")
+
+    def mensagem(resultado):
+        ultima = resultado["ultima_cobranca"]
+        if not ultima:
+            return "Contrato encerrado."
+        return (f"Contrato encerrado. Última cobrança: {ultima['competencia'][5:]}/{ultima['competencia'][:4]}, "
+                f"{ultima['valor']} ({ultima['dias']} de {ultima['dias_do_mes']} dias até a saída).")
+
+    return acao(request, f"/contratos/{contrato_id}", encerrar, mensagem)
 
 
 @app.post("/contratos/{contrato_id}/apagar")
@@ -538,7 +552,7 @@ def pagamentos(request: Request, data_de: str = "", data_ate: str = "", grupo: s
     except ErroDeNegocio as erro:
         avisar(request, str(erro), "erro")
         historico = consultas.historico_pagamentos()
-    return pagina(request, "pagamentos.html", h=historico, grupos=consultas.grupos(),
+    return pagina(request, "pagamentos.html", h=historico, grupos=consultas.grupos(), hoje_ano=regras.hoje().year,
                    locatarios=consultas.listar_locatarios(),
                    filtros=dict(data_de=data_de, data_ate=data_ate, grupo=grupo, locatario_id=locatario_id,
                                 cancelados=cancelados))
