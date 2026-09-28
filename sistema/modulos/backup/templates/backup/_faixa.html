@@ -1,0 +1,5 @@
+{# Aviso de backup no painel: faixa colorida só quando há problema; uma linha discreta quando está tudo bem. #}
+{% set b = status_backup() %}
+{% if b.nivel == "erro" %}<div class="msg erro"><strong>Atenção:</strong> {{ b.mensagem }}</div>
+{% elif b.nivel == "aviso" %}<div class="msg aviso">{{ b.mensagem }}</div>
+{% else %}<p class="backup-ok"><small>{{ b.mensagem }}</small></p>{% endif %}

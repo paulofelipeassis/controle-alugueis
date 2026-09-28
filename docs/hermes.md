@@ -17,6 +17,8 @@ para uma pessoa olhar, em vez de adivinhar.
 
 - Valores em reais, como texto no formato brasileiro: `"1.500,00"`.
 - Datas: `AAAA-MM-DD` (ex.: `2026-10-10`).
+- Vencimento em sábado, domingo ou feriado vale até o dia útil seguinte, sem multa nem juros (o
+  sistema já considera isso: `vencimento_efetivo`). No boleto do banco, use o vencimento do contrato.
 - Listas vêm como `{"quantidade": N, "itens": [...]}`. `quantidade: 0` quer dizer que não
   há nada (por exemplo, nenhuma pendência), não que houve erro.
 - Competência (mês da cobrança): `AAAA-MM`. A cobrança de outubro é a que **vence** em
@@ -30,6 +32,8 @@ para uma pessoa olhar, em vez de adivinhar.
 1. `cobrancas_sem_boleto`: traz o que precisa de boleto, já com nome, CPF/CNPJ, e-mail,
    valor, vencimento, multa e juros do contrato. Pule as que têm `reajuste_pendente: true`
    (veja "Reajuste anual").
+   Se `data_encerramento` vier preenchido (contrato encerrado, dívida antiga), **não emita** sem
+   perguntar ao Paulo.
 2. Emitir cada boleto no banco (hoje a Caixa), com a multa e os juros informados.
 3. `registrar_boleto` com o nosso número (`identificador`), a linha digitável e o link.
 4. Enviar o boleto por e-mail ao locatário.
@@ -40,7 +44,10 @@ para uma pessoa olhar, em vez de adivinhar.
 2. Conferir no banco quais foram pagos.
 3. Para cada pago: `registrar_pagamento_boleto` com o identificador, a data e o valor que o
    banco informou. Pode repetir sem medo: o mesmo boleto nunca vira dois pagamentos.
-4. Se a resposta trouxer `pendencias` ou `registrado: false`, avise o Paulo.
+4. Se a resposta trouxer `pendencias` ou `registrado: false`, avise o Paulo. `registrado: false`
+   quer dizer que o dinheiro entrou mas o sistema não conseguiu ligá-lo a uma cobrança (boleto
+   desconhecido, ou cobrança isentada ou cancelada): uma pendência foi criada, não faça mais nada.
+5. Boleto de segunda via: o antigo continua pagável no banco e o sistema reconhece a baixa dele.
 
 ### Todo dia: avisos
 `alertas` e `inadimplentes`. Sugestão: mandar ao Paulo um resumo curto só quando houver

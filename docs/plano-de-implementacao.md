@@ -32,6 +32,11 @@ Diferenças em relação ao plano abaixo, e por quê:
 - As cobranças não precisam de agendamento: são geradas (de forma idempotente) sempre que
   uma consulta depende delas.
 
+Revisão antes de ir para o servidor (28/09/2026): dia útil no vencimento, pendências de boleto
+(cobrança cancelada, segunda via, reajuste depois do boleto), reabrir contrato, migrações do banco,
+aviso de backup no painel, bloqueio de tentativas de login, cookie seguro e arquivos enviados só
+abrem no navegador se forem PDF, imagem ou texto. Detalhes nas regras de negócio.
+
 ## 0. Como trabalhar (leia antes de tudo)
 
 ### Sobre o Paulo

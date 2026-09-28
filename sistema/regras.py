@@ -2,7 +2,7 @@
 import calendar
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
@@ -81,6 +81,54 @@ def primeira_competencia(data_inicio, dia_vencimento, inicio_cobrancas):
     if vencimento(competencia, dia_vencimento) < data_inicio:
         competencia = proxima_competencia(competencia)
     return max(competencia, inicio_cobrancas)
+
+
+# --- DIA ÚTIL ---
+# Vencimento que cai em dia sem expediente bancário (fim de semana ou feriado) vale até o dia útil
+# seguinte, sem multa nem juros: regra dos boletos bancários, e o Código Civil (art. 132, §1º)
+# prorroga para o dia útil seguinte o prazo que vence em feriado.
+def pascoa(ano):
+    """Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher, calendário gregoriano)."""
+    a = ano % 19
+    b, c = divmod(ano, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    mes, dia = divmod(h + ell - 7 * m + 114, 31)
+    return date(ano, mes, dia + 1)
+
+
+def feriados(ano):
+    """Feriados nacionais e dias sem expediente bancário no ano, mais os de config.FERIADOS_EXTRAS."""
+    dias = {date(ano, m, d) for m, d in [(1, 1), (4, 21), (5, 1), (9, 7), (10, 12), (11, 2), (11, 15), (12, 25)]}
+    if ano >= 2024:  # Dia da Consciência Negra virou feriado nacional (Lei 14.759/2023)
+        dias.add(date(ano, 11, 20))
+    p = pascoa(ano)
+    dias |= {p - timedelta(days=48), p - timedelta(days=47),  # carnaval (segunda e terça)
+             p - timedelta(days=2),                           # sexta-feira santa
+             p + timedelta(days=60)}                          # corpus christi
+    for item in filter(None, (x.strip() for x in config.FERIADOS_EXTRAS.split(","))):
+        try:
+            partes = [int(x) for x in item.split("-")]
+            dias.add(date(ano, *partes) if len(partes) == 2 else date(*partes))
+        except ValueError:
+            raise ErroDeNegocio(f"FERIADOS_EXTRAS inválido: '{item}'. Use MM-DD ou AAAA-MM-DD.") from None
+    return dias
+
+
+def dia_util(data):
+    return data.weekday() < 5 and data not in feriados(data.year)
+
+
+def vencimento_efetivo(data):
+    """Último dia para pagar sem multa e juros: o próprio vencimento, ou o primeiro dia útil depois dele."""
+    while not dia_util(data):
+        data += timedelta(days=1)
+    return data
 
 
 # --- DINHEIRO (sempre em centavos, inteiro) ---
@@ -189,6 +237,11 @@ def validar_cpf_cnpj(texto):
     if len(digitos) not in (11, 14):
         raise ErroDeNegocio(f"CPF/CNPJ inválido: '{texto}'. O CPF tem 11 dígitos e o CNPJ tem 14.")
     return digitos
+
+
+def chave_nome(texto):
+    """Forma de comparar nomes ignorando acento, maiúscula e pontuação ('Anel Viário' = 'anel viario')."""
+    return nome_pasta(texto).casefold()
 
 
 def nome_pasta(texto):

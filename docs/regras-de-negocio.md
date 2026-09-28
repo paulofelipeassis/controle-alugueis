@@ -45,7 +45,9 @@ O **como construir** está em [`plano-de-implementacao.md`](plano-de-implementac
 Grupo (ex.: "Anel Viário"), unidade (ex.: "Apto 101"), endereço, IPTU anual, nº do medidor
 Saneago, nº do medidor Enel, observações, e uma marcação **"em manutenção"**.
 
-- Grupo + unidade não se repetem.
+- Grupo + unidade não se repetem, **nem com outra grafia** ("Anel Viário" e "Anel Viario", maiúsculas
+  e espaços a mais contam como o mesmo imóvel): as pastas de documentos usam o nome sem acento e se
+  misturariam.
 - Situação calculada: **Alugado** se tem contrato ativo; senão **Em manutenção** se marcado;
   senão **Vago**.
 
@@ -65,7 +67,8 @@ por falhas do contrato. Contrato pode ter corretor ou não.
 
 ### Usuário
 Login próprio para cada pessoa (nome, login, senha). Todos com acesso total. Sem níveis de
-permissão.
+permissão. Depois de 5 senhas erradas seguidas no mesmo login, o login fica bloqueado por 15
+minutos. Senha esquecida: quem cuida do servidor troca pelo terminal (`docs/instalacao-servidor.md`).
 
 ## 4. Contrato
 
@@ -115,6 +118,13 @@ Regras:
 - **Encerrar** = informar data e motivo. As cobranças com vencimento depois do encerramento
   e sem pagamento são canceladas. Se alguma já tinha boleto emitido, o sistema cria uma
   **pendência** "cancelar boleto no banco". Dívidas anteriores continuam em aberto.
+- **Reabrir** um contrato encerrado por engano (ou com a data errada): só pessoas, pela web, com
+  motivo. O contrato volta a ficar ativo e as cobranças que o encerramento cancelou voltam a valer;
+  as que tinham boleto viram pendência ("o boleto pode ter sido cancelado no banco"). Não reabre se
+  o imóvel já tem outro contrato ativo.
+- A **data de fim prevista** pode ser corrigida a qualquer momento (para mais ou para menos). Início,
+  dia de vencimento e valor não se corrigem: se foram cadastrados errados e ainda não há pagamento
+  nem boleto, apaga-se o contrato e cadastra-se de novo.
 - Contrato cadastrado por engano pode ser apagado **só se** não tiver nenhum pagamento nem
   boleto.
 
@@ -127,6 +137,14 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
 - **Competência** = mês do vencimento. "A cobrança de outubro é a que vence em outubro."
 - **Vencimento** = dia de vencimento do contrato naquele mês. Se o mês não tem esse dia
   (29, 30, 31), vence no **último dia do mês**.
+- **Vencimento em dia sem expediente bancário** (sábado, domingo, feriado nacional, Carnaval,
+  Sexta-feira Santa, Corpus Christi, e os dias de `FERIADOS_EXTRAS`): o locatário pode pagar até o
+  **primeiro dia útil seguinte** sem multa nem juros. A cobrança só fica atrasada, e a multa e os
+  juros só contam, a partir daí. Base: regra dos boletos bancários e Código Civil, art. 132, §1º
+  ("se o dia do vencimento cair em feriado, considerar-se-á prorrogado o prazo até o seguinte dia
+  útil"). Sem isso, o boleto pago na segunda-feira de um vencimento de sábado apareceria como
+  atrasado e geraria pendência falsa. Feriados municipais (ex.: 24/10 em Goiânia) entram em
+  `FERIADOS_EXTRAS`.
 - **Primeira cobrança** = o primeiro vencimento **a partir da data de início** do contrato.
 - **Início das cobranças no sistema:** parâmetro `INICIO_COBRANCAS` (combinado: outubro de
   2026, `2026-10`). Nenhuma cobrança é gerada antes disso. Se o sistema entrar no ar mais
@@ -160,7 +178,8 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
   API do banco (com multa e juros do contrato) → registra o boleto na cobrança → envia por
   e-mail ao locatário → marca como enviado.
 - Um boleto por cobrança. Segunda via / reemissão: registrar de novo com "substituir"; o
-  identificador antigo fica na auditoria.
+  identificador antigo fica na auditoria. **O boleto antigo continua pagável no banco**: se o banco
+  informar o pagamento dele, o sistema reconhece a cobrança pela auditoria e dá a baixa normalmente.
 - **Baixa:** o Hermes confere o banco **todo dia** (ou recebe aviso do banco, se a API
   oferecer) e registra o pagamento **pelo identificador do boleto**.
 - **Idempotente:** registrar o mesmo pagamento duas vezes não duplica (o identificador
@@ -183,9 +202,17 @@ caminho do comprovante (opcional), observação, quem registrou e quando.
   - o valor não bate com o esperado (diferença maior que R$ 1,00 do valor, ou do valor
     atualizado se atrasado);
   - a cobrança já estava paga (possível duplicidade);
-  - o contrato já está encerrado.
+  - o pagamento é **depois** da data de encerramento do contrato (dívida paga por quem já saiu). Pagar
+    antes ou na própria data de encerramento, inclusive com o encerramento registrado com antecedência,
+    não gera pendência.
 - Boleto pago que o sistema não conhece (identificador não encontrado): **não** registra
   pagamento, cria pendência "boleto desconhecido".
+- Boleto pago de uma cobrança já **isentada ou cancelada** (o banco não cancelou o boleto e o locatário
+  pagou): o pagamento não entra na cobrança, mas o dinheiro **não se perde**: vira pendência
+  "pagamento sem cobrança", para uma pessoa decidir entre devolver ou reativar. Repetir a baixa não
+  cria outra pendência.
+- Reajuste registrado depois de o boleto já ter sido emitido com o valor antigo: pendência
+  "boleto com valor antigo" (segunda via com o valor novo, ou cobrar a diferença depois).
 
 ## 8. Pendências
 
@@ -243,7 +270,19 @@ Os mesmos para a web e para o Hermes:
 ## 12. Backup
 
 Diário, para o **Google Drive**, com o banco e a pasta de documentos. Roda no servidor,
-**independente do Hermes**. Mantém pelo menos as últimas 14 cópias.
+**independente do Hermes**. Mantém pelo menos as últimas 14 cópias. Faz um backup também ao ligar
+seu servidor, se o último completo tem mais de 20 horas.
+
+O **painel avisa** (módulo opcional `backup`): faixa vermelha se o backup falhou ou está parado há
+mais de 36 horas (ninguém lê o log do servidor), faixa amarela se o Drive não está configurado, e uma
+linha discreta com a data do último backup quando está tudo certo. Backup que nunca foi restaurado
+não vale: o procedimento de restauração está em `docs/instalacao-servidor.md` e foi testado.
+
+## 12b. Mudanças futuras no banco
+
+O sistema guarda a versão do schema. Toda mudança depois de haver dados reais entra como uma
+**migração** numerada (`sistema/db.py`, lista `MIGRACOES`), aplicada uma única vez, com cópia do
+banco antes. Nunca se edita uma migração já publicada.
 
 ## 13. Fora do escopo (não fazer)
 

@@ -97,3 +97,23 @@ def test_usuario_e_login():
     assert servicos.autenticar("paulo", "errada") is None
     with pytest.raises(ErroDeNegocio):
         servicos.criar_usuario("paulo", "Outro", "outra-senha")
+
+
+def test_script_cria_usuario_e_troca_senha(monkeypatch):
+    from scripts import criar_usuario
+
+    respostas = iter(["ana", "Ana Lima", "n"])
+    senhas = iter(["senha-inicial-1", "senha-inicial-1"])
+    monkeypatch.setattr("builtins.input", lambda _="": next(respostas))
+    monkeypatch.setattr(criar_usuario, "getpass", lambda _="": next(senhas))
+    criar_usuario.main()
+    assert servicos.autenticar("ana", "senha-inicial-1")
+
+    respostas = iter(["ANA", "s"])  # esqueceu a senha: o login existente pede troca
+    senhas = iter(["senha-nova-99", "senha-nova-99"])
+    criar_usuario.main()
+    assert servicos.autenticar("ana", "senha-nova-99") and not servicos.autenticar("ana", "senha-inicial-1")
+
+    respostas = iter(["ana", "n"])  # desiste: nada muda
+    criar_usuario.main()
+    assert servicos.autenticar("ana", "senha-nova-99")

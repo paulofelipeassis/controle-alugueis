@@ -2,6 +2,7 @@
 {% from "_macros.html" import selo %}
 {% block conteudo %}
 <h2>Painel</h2>
+{% if modulo_ativo("backup") %}{% include "backup/_faixa.html" %}{% endif %}
 {% if p.pendencias_abertas %}
 <div class="msg aviso"><a href="/pendencias"><strong>{{ p.pendencias_abertas }} pendência(s)</strong> para conferir →</a></div>
 {% endif %}

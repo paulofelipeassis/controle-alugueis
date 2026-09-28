@@ -4,7 +4,7 @@
 <h2>Cobrança {{ c.competencia|comp }} {{ selo(c.situacao_calculada) }}</h2>
 <p><a href="/contratos/{{ contrato.id }}">{{ contrato.imovel_nome }} — {{ contrato.locatario_nome }}</a></p>
 <ul>
-  <li>Vencimento: {{ c.vencimento|data }}</li>
+  <li>Vencimento: {{ c.vencimento|data }}{% if c.vencimento_efetivo != c.vencimento %} <small>(dia sem expediente bancário: pode ser pago sem multa e juros até {{ c.vencimento_efetivo|data }})</small>{% endif %}</li>
   <li>Valor: <strong>{{ c.valor }}</strong> · pago: {{ c.pago }} · saldo: <strong>{{ c.saldo }}</strong></li>
   {% if c.situacao_calculada == "atrasada" %}<li>{{ c.dias_atraso }} dias de atraso · com multa e juros: <strong>{{ c.valor_atualizado }}</strong></li>{% endif %}
   {% if c.motivo_situacao %}<li>Motivo: {{ c.motivo_situacao }}</li>{% endif %}

@@ -19,6 +19,15 @@
 </div>
 
 <div class="acoes"><a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a></div>
+{% if c.status == "encerrado" %}
+<details class="acao"><summary>Reabrir contrato (encerrei por engano)</summary>
+  <form method="post" action="/contratos/{{ c.id }}/reabrir" onsubmit="return confirm('Reabrir este contrato?')">
+    <label>Motivo * <input type="text" name="motivo" required placeholder="Ex.: encerrado com a data errada"></label>
+    <small>O contrato volta a ficar ativo e as cobranças que o encerramento cancelou voltam a valer. O imóvel não pode ter outro contrato ativo.</small>
+    <button type="submit" class="secondary">Reabrir contrato</button>
+  </form>
+</details>
+{% endif %}
 {% if c.status == "ativo" %}
 <details class="acao"><summary>Registrar reajuste</summary>
   {% if c.indice_reajuste and modulo_ativo("reajuste") %}<p><a role="button" class="outline" href="/contratos/{{ c.id }}/reajuste">Calcular pelo {{ c.indice_reajuste }} (últimos 12 meses)</a></p>{% endif %}

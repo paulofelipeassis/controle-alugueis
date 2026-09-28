@@ -149,10 +149,14 @@ class Simulacao:
         valor = cb["saldo_centavos"]
         perfil = self.perfil[cb["contrato_id"]]
         if perfil == "pontual":
-            self.agendar(venc - timedelta(days=self.rng.randint(0, 3)), cb["id"], valor, "boleto", identificador)
+            if self.rng.random() < 0.4:  # paga no último dia possível: o dia útil do vencimento (sem encargos)
+                self.agendar(regras.vencimento_efetivo(venc), cb["id"], valor, "boleto", identificador)
+            else:
+                self.agendar(venc - timedelta(days=self.rng.randint(0, 3)), cb["id"], valor, "boleto", identificador)
         elif perfil == "atrasa_com_juros":
             dia = venc + timedelta(days=self.rng.randint(3, 20))
-            multa, juros = regras.encargos(valor, cb["multa_pct"], cb["juros_mes_pct"], venc, dia)
+            multa, juros = regras.encargos(valor, cb["multa_pct"], cb["juros_mes_pct"],
+                                           regras.vencimento_efetivo(venc), dia)
             self.agendar(dia, cb["id"], valor + multa + juros, "boleto", identificador)
         elif perfil == "atrasa_sem_juros":
             self.agendar(venc + timedelta(days=self.rng.randint(3, 10)), cb["id"], valor, "pix", f"E2E{cb['id']}")
@@ -320,6 +324,12 @@ class Simulacao:
         self.conferir(esperados <= tipos, f"faltaram pendências dos tipos {esperados - tipos}")
         alertas = consultas.alertas(hoje=self.hoje)
         self.conferir(any(a["tipo"] == "prazo_vencido" for a in alertas), "contrato com prazo vencido sem alerta")
+        with db.leitura() as con:  # quem paga em dia (mesmo no dia útil do vencimento) nunca vira 'pagamento diferente'
+            falsos = con.execute(
+                "SELECT COUNT(*) FROM pendencias pe JOIN pagamentos pg ON pe.entidade = 'pagamento' AND pe.entidade_id = pg.id "
+                "JOIN cobrancas cb ON cb.id = pg.cobranca_id WHERE pe.tipo = 'pagamento_divergente' AND cb.contrato_id IN (%s)"
+                % ",".join(str(c) for c, p in self.perfil.items() if p == "pontual")).fetchone()[0]
+        self.conferir(falsos == 0, f"{falsos} pendência(s) falsa(s) para locatários pontuais")
         devedores = {g["contrato_id"] for g in consultas.inadimplentes(hoje=self.hoje)}
         self.conferir(self.contratos[8] in devedores, "dívida do contrato encerrado sumiu dos inadimplentes")
 

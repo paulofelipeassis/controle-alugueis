@@ -82,16 +82,13 @@ def listar_locatarios():
 
 
 def buscar_locatarios(texto):
-    """Busca por parte do nome ou do CPF/CNPJ."""
-    texto = (texto or "").strip()
-    digitos = regras.so_digitos(texto)
-    with db.leitura() as con:
-        return _dicts(con.execute(
-            "SELECT l.*, (SELECT COUNT(*) FROM contratos c WHERE c.locatario_id = l.id "
-            "AND c.data_encerramento IS NULL) AS contratos_ativos FROM locatarios l "
-            "WHERE l.nome LIKE ? OR (? <> '' AND l.cpf_cnpj LIKE ?) ORDER BY l.nome",
-            (f"%{texto}%", digitos, f"%{digitos}%"),
-        ))
+    """Busca por parte do nome (sem diferenciar acento nem maiúscula: 'joao' acha 'João') ou do CPF/CNPJ."""
+    chave, digitos = regras.chave_nome(texto), regras.so_digitos(texto)
+    todos = listar_locatarios()
+    if not chave and not digitos:
+        return todos
+    return [l for l in todos if (chave and chave in regras.chave_nome(l["nome"]))
+            or (digitos and digitos in l["cpf_cnpj"])]
 
 
 def listar_corretores():
@@ -159,7 +156,10 @@ _SQL_COBRANCAS = (
 
 def _cobranca(linha, hoje):
     cobranca = dict(linha)
-    venc = para_data(linha["vencimento"])
+    contratual = para_data(linha["vencimento"])
+    # Atraso e encargos contam a partir do dia útil seguinte ao vencimento (ver regras.vencimento_efetivo).
+    venc = regras.vencimento_efetivo(contratual)
+    cobranca["vencimento_efetivo"] = venc.isoformat()
     saldo = max(linha["valor_centavos"] - linha["pago_centavos"], 0)
     cobranca["imovel_nome"] = _imovel_nome(linha)
     cobranca["saldo_centavos"] = saldo if linha["situacao"] == "normal" else 0
@@ -172,7 +172,7 @@ def _cobranca(linha, hoje):
     # o boleto não deve sair com o valor antigo.
     cobranca["reajuste_pendente"] = bool(
         linha["situacao"] == "normal" and saldo > 0 and linha["indice_reajuste"] and linha["ultimo_valor_desde"]
-        and venc >= regras.proximo_aniversario(para_data(linha["ultimo_valor_desde"])))
+        and contratual >= regras.proximo_aniversario(para_data(linha["ultimo_valor_desde"])))
     if cobranca["situacao_calculada"] == "atrasada":
         multa, juros = regras.encargos(saldo, linha["multa_pct"], linha["juros_mes_pct"], venc, hoje)
         cobranca["dias_atraso"] = (hoje - venc).days
