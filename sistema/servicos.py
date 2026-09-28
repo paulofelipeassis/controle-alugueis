@@ -36,6 +36,10 @@ def _obter(con, tabela, id_, nome):
     return linha
 
 
+def _data_br(iso):
+    return f"{iso[8:10]}/{iso[5:7]}/{iso[0:4]}"
+
+
 def _texto(valor):
     texto = str(valor).strip() if valor is not None else ""
     return texto or None
@@ -100,6 +104,16 @@ def _nova_pendencia(con, quem, tipo, descricao, entidade=None, entidade_id=None)
     return {"pendencia_id": cur.lastrowid, "tipo": tipo, "descricao": descricao}
 
 
+def _pendencia_boleto_valor_antigo(con, quem, cobranca, valor_novo, causa):
+    """O boleto já emitido tem o valor antigo: o sistema não muda boleto, uma pessoa decide."""
+    return _nova_pendencia(
+        con, quem, "boleto_valor_antigo",
+        f"O boleto {cobranca['boleto_identificador']} ({_rotulo_cobranca(con, cobranca)}) foi emitido com "
+        f"{regras.formatar_reais(cobranca['valor_centavos'])}, mas {causa} {regras.formatar_reais(valor_novo)}. "
+        "Emita segunda via com o valor novo e registre-a como substituta, ou cobre a diferença depois.",
+        "cobranca", cobranca["id"])
+
+
 def _rotulo_cobranca(con, cobranca):
     linha = con.execute(
         "SELECT i.grupo, i.unidade, l.nome FROM contratos c JOIN imoveis i ON i.id = c.imovel_id "
@@ -132,6 +146,16 @@ def _campos_imovel(dados):
     return campos
 
 
+def _conferir_imovel_repetido(con, grupo, unidade, ignorar_id=None):
+    """Grupo + unidade não podem se repetir, nem com outra grafia (acento, maiúscula): as pastas de
+    documentos usam o nome sem acento e se misturariam."""
+    chave = (regras.chave_nome(grupo), regras.chave_nome(unidade))
+    for i in con.execute("SELECT id, grupo, unidade FROM imoveis").fetchall():
+        if i["id"] != ignorar_id and (regras.chave_nome(i["grupo"]), regras.chave_nome(i["unidade"])) == chave:
+            raise ErroDeNegocio(f"Já existe o imóvel '{i['grupo']} - {i['unidade']}' "
+                                "(o mesmo nome, com ou sem acento ou maiúsculas).")
+
+
 def _erro_imovel_duplicado(campos):
     return ErroDeNegocio(f"Já existe o imóvel '{campos.get('grupo')} - {campos.get('unidade')}'.")
 
@@ -145,6 +169,7 @@ def cadastrar_imovel(quem, grupo, unidade, endereco, iptu_anual_centavos=None, m
     ))
     try:
         with db.transacao() as con:
+            _conferir_imovel_repetido(con, campos["grupo"], campos["unidade"])
             cur = con.execute(
                 f"INSERT INTO imoveis ({', '.join(campos)}) VALUES ({', '.join('?' * len(campos))})",
                 tuple(campos.values()),
@@ -159,7 +184,10 @@ def atualizar_imovel(quem, imovel_id, **dados):
     campos = _campos_imovel(dados)
     try:
         with db.transacao() as con:
-            _obter(con, "imoveis", imovel_id, "Imóvel")
+            atual = _obter(con, "imoveis", imovel_id, "Imóvel")
+            if "grupo" in campos or "unidade" in campos:
+                _conferir_imovel_repetido(con, campos.get("grupo", atual["grupo"]),
+                                          campos.get("unidade", atual["unidade"]), ignorar_id=imovel_id)
             _atualizar(con, "imoveis", imovel_id, campos)
             auditar(con, quem, "atualizar_imovel", "imovel", imovel_id, **campos)
     except sqlite3.IntegrityError:
@@ -356,10 +384,18 @@ def criar_contrato(quem, imovel_id, locatario_id, data_inicio, data_fim_prevista
 
 
 def atualizar_contrato(quem, contrato_id, **dados):
-    """Só campos que não mexem em datas nem valores de cobrança."""
+    """Corrige dados do contrato. Não mexe em valor, dia de vencimento nem data de início (isso é
+    reajuste, ou apagar e refazer um contrato cadastrado com erro); a data de fim prevista pode ser
+    corrigida (renovar só permite estender)."""
+    data_fim = dados.pop("data_fim_prevista", None)
     campos = _campos_contrato_editaveis(dados)
     with db.transacao() as con:
-        _obter(con, "contratos", contrato_id, "Contrato")
+        contrato = _obter(con, "contratos", contrato_id, "Contrato")
+        if data_fim:
+            fim = para_data(data_fim, "data de fim prevista")
+            if fim <= para_data(contrato["data_inicio"]):
+                raise ErroDeNegocio("A data de fim prevista precisa ser depois da data de início.")
+            campos["data_fim_prevista"] = fim.isoformat()
         if campos.get("corretor_id") is not None:
             _obter(con, "corretores", campos["corretor_id"], "Corretor")
         _atualizar(con, "contratos", contrato_id, campos)
@@ -387,18 +423,30 @@ def _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, vigente_des
     )
     auditar(con, quem, "registrar_reajuste", "contrato", contrato_id, valor_centavos=valor,
              vigente_desde=desde, motivo=motivo, cobrancas_atualizadas=cur.rowcount)
+    # Boleto já emitido com o valor antigo: o sistema não muda o boleto; uma pessoa decide.
+    pendencias = []
+    for cobranca in con.execute(
+        "SELECT * FROM cobrancas c WHERE contrato_id = ? AND situacao = 'normal' AND vencimento >= ? "
+        "AND boleto_identificador IS NOT NULL AND valor_centavos <> ? AND NOT EXISTS ("
+        "  SELECT 1 FROM pagamentos p WHERE p.cobranca_id = c.id AND p.cancelado_em IS NULL)",
+        (contrato_id, desde, valor),
+    ).fetchall():
+        pendencias.append(_pendencia_boleto_valor_antigo(con, quem, cobranca, valor, "o reajuste é"))
+    return pendencias
 
 
 def registrar_reajuste(quem, contrato_id, novo_valor_centavos, vigente_desde, motivo=None):
     with db.transacao() as con:
         _contrato_ativo(con, contrato_id)
-        _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, vigente_desde, motivo)
+        pendencias = _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, vigente_desde, motivo)
     gerar_cobrancas("sistema")
+    return {"pendencias": pendencias}
 
 
 def renovar_contrato(quem, contrato_id, nova_data_fim, novo_valor_centavos=None, vigente_desde=None, motivo=None):
     """Renovação = nova data de fim no mesmo contrato (e, se vier, novo valor)."""
     nova_fim = para_data(nova_data_fim, "nova data de fim")
+    pendencias = []
     with db.transacao() as con:
         contrato = _contrato_ativo(con, contrato_id)
         fim_atual = para_data(contrato["data_fim_prevista"])
@@ -409,29 +457,77 @@ def renovar_contrato(quem, contrato_id, nova_data_fim, novo_valor_centavos=None,
                  data_fim_anterior=fim_atual.isoformat(), nova_data_fim=nova_fim.isoformat())
         if novo_valor_centavos:
             desde = vigente_desde or (fim_atual + timedelta(days=1))
-            _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, desde, motivo or "renovação")
+            pendencias = _registrar_reajuste(con, quem, contrato_id, novo_valor_centavos, desde, motivo or "renovação")
     gerar_cobrancas("sistema")
+    return {"pendencias": pendencias}
 
 
-def encerrar_contrato(quem, contrato_id, data_encerramento, motivo):
+PREFIXO_ULTIMA = "última cobrança"  # começa o motivo da cobrança final mantida por cobrar_ate_a_saida
+
+
+def encerrar_contrato(quem, contrato_id, data_encerramento, motivo, cobrar_ate_a_saida=False):
+    """Encerra o contrato: as cobranças que vencem depois da saída e não têm pagamento são canceladas.
+
+    cobrar_ate_a_saida=True é para contrato cujo aluguel é pago DEPOIS do uso (o aluguel de março vence em
+    abril; é o padrão da Lei do Inquilinato, art. 23, I): a cobrança que vence no mês seguinte ao da saída
+    cobre os dias usados e é mantida, com valor proporcional (dias corridos do mês da saída). Com False
+    (aluguel no próprio mês ou adiantado), nada é cobrado depois da saída.
+    """
     data = para_data(data_encerramento, "data de encerramento")
     motivo = _obrigatorio(motivo, "motivo do encerramento")
     # Gera o que faltava até hoje antes de encerrar, para o encerramento enxergar tudo.
     gerar_cobrancas("sistema")
     with db.transacao() as con:
         contrato = _contrato_ativo(con, contrato_id)
-        if data < para_data(contrato["data_inicio"]):
+        inicio = para_data(contrato["data_inicio"])
+        if data < inicio:
             raise ErroDeNegocio("A data de encerramento não pode ser antes do início do contrato.")
         con.execute(
             "UPDATE contratos SET data_encerramento = ?, motivo_encerramento = ? WHERE id = ?",
             (data.isoformat(), motivo, contrato_id),
         )
-        futuras = con.execute(
+        mes_saida = regras.competencia_de(data)
+        ultima = regras.proxima_competencia(mes_saida)  # o vencimento que cobre o uso do mês da saída
+        primeira = regras.primeira_competencia(inicio, contrato["dia_vencimento"], config.INICIO_COBRANCAS)
+        mes_inicio = regras.competencia_de(inicio)
+
+        def devida(competencia):  # ainda é devida depois da saída? (só se o aluguel é pago depois do uso)
+            return bool(cobrar_ate_a_saida) and mes_inicio < competencia <= ultima and competencia >= primeira
+
+        if cobrar_ate_a_saida:  # a geração automática não passa da saída: cria as que vencem depois dela
+            for competencia in (mes_saida, ultima):
+                vencimento = regras.vencimento(competencia, contrato["dia_vencimento"])
+                if devida(competencia) and vencimento > data:
+                    con.execute(
+                        "INSERT OR IGNORE INTO cobrancas (contrato_id, competencia, vencimento, valor_centavos) "
+                        "VALUES (?, ?, ?, ?)",
+                        (contrato_id, competencia, vencimento.isoformat(),
+                         valor_vigente(con, contrato_id, vencimento.isoformat())))
+        candidatas = con.execute(
             "SELECT * FROM cobrancas c WHERE contrato_id = ? AND situacao = 'normal' AND vencimento > ? "
             "AND NOT EXISTS (SELECT 1 FROM pagamentos p WHERE p.cobranca_id = c.id AND p.cancelado_em IS NULL)",
             (contrato_id, data.isoformat()),
         ).fetchall()
+        mantidas = [c for c in candidatas if devida(c["competencia"])]
+        futuras = [c for c in candidatas if not devida(c["competencia"])]
         pendencias = []
+        ultima_cobranca = None
+        for cobranca in mantidas:
+            if cobranca["competencia"] != ultima:
+                continue
+            no_mes = regras.dias_do_mes(mes_saida)
+            primeiro_dia = inicio.day if mes_inicio == mes_saida else 1
+            dias = data.day - primeiro_dia + 1
+            valor = regras.valor_proporcional(cobranca["valor_centavos"], dias, no_mes)
+            con.execute("UPDATE cobrancas SET valor_centavos = ?, motivo_situacao = ? WHERE id = ?",
+                        (valor, f"{PREFIXO_ULTIMA} (até a saída): {dias} de {no_mes} dias de {mes_saida}",
+                         cobranca["id"]))
+            if cobranca["boleto_identificador"] and valor != cobranca["valor_centavos"]:
+                pendencias.append(_pendencia_boleto_valor_antigo(
+                    con, quem, cobranca, valor, "o valor proporcional até a saída é"))
+            ultima_cobranca = {"id": cobranca["id"], "competencia": ultima, "vencimento": cobranca["vencimento"],
+                               "valor_centavos": valor, "valor": regras.formatar_reais(valor),
+                               "dias": dias, "dias_do_mes": no_mes}
         for cobranca in futuras:
             con.execute(
                 "UPDATE cobrancas SET situacao = 'cancelada', motivo_situacao = 'contrato encerrado' WHERE id = ?",
@@ -445,8 +541,54 @@ def encerrar_contrato(quem, contrato_id, data_encerramento, motivo):
                     "cobranca", cobranca["id"],
                 ))
         auditar(con, quem, "encerrar_contrato", "contrato", contrato_id, data_encerramento=data.isoformat(),
-                 motivo=motivo, cobrancas_canceladas=[c["id"] for c in futuras])
-    return {"cobrancas_canceladas": len(futuras), "pendencias": pendencias}
+                 motivo=motivo, cobrar_ate_a_saida=bool(cobrar_ate_a_saida),
+                 cobrancas_canceladas=[c["id"] for c in futuras], cobrancas_mantidas=[c["id"] for c in mantidas])
+    return {"cobrancas_canceladas": len(futuras), "cobrancas_mantidas": len(mantidas),
+            "ultima_cobranca": ultima_cobranca, "pendencias": pendencias}
+
+
+def reabrir_contrato(quem, contrato_id, motivo):
+    """Desfaz um encerramento feito por engano (ou com a data errada): o contrato volta a ficar ativo e
+    as cobranças que o encerramento cancelou voltam a valer. Só pessoas, pela web."""
+    motivo = _obrigatorio(motivo, "motivo")
+    pendencias = []
+    with db.transacao() as con:
+        contrato = _obter(con, "contratos", contrato_id, "Contrato")
+        if not contrato["data_encerramento"]:
+            raise ErroDeNegocio("Esse contrato não está encerrado.")
+        outro = con.execute("SELECT id FROM contratos WHERE imovel_id = ? AND data_encerramento IS NULL",
+                            (contrato["imovel_id"],)).fetchone()
+        if outro:
+            raise ErroDeNegocio(f"O imóvel já tem outro contrato ativo (contrato {outro['id']}). "
+                                "Encerre esse antes de reabrir este.")
+        con.execute("UPDATE contratos SET data_encerramento = NULL, motivo_encerramento = NULL WHERE id = ?",
+                    (contrato_id,))
+        restauradas = con.execute(
+            "SELECT * FROM cobrancas WHERE contrato_id = ? AND situacao = 'cancelada' "
+            "AND motivo_situacao = 'contrato encerrado'", (contrato_id,)).fetchall()
+        for cobranca in restauradas:
+            con.execute("UPDATE cobrancas SET situacao = 'normal', motivo_situacao = NULL WHERE id = ?",
+                        (cobranca["id"],))
+            if cobranca["boleto_identificador"]:
+                pendencias.append(_nova_pendencia(
+                    con, quem, "reemitir_boleto",
+                    f"O contrato foi reaberto e o boleto {cobranca['boleto_identificador']} "
+                    f"({_rotulo_cobranca(con, cobranca)}) pode ter sido cancelado no banco. Confira e, se preciso, "
+                    "emita outro e registre como substituto.", "cobranca", cobranca["id"]))
+        for cobranca in con.execute(  # a cobrança final proporcional volta ao valor cheio
+            "SELECT * FROM cobrancas c WHERE contrato_id = ? AND situacao = 'normal' AND motivo_situacao LIKE ? "
+            "AND NOT EXISTS (SELECT 1 FROM pagamentos p WHERE p.cobranca_id = c.id AND p.cancelado_em IS NULL)",
+            (contrato_id, f"{PREFIXO_ULTIMA}%")).fetchall():
+            cheio = valor_vigente(con, contrato_id, cobranca["vencimento"])
+            con.execute("UPDATE cobrancas SET valor_centavos = ?, motivo_situacao = NULL WHERE id = ?",
+                        (cheio, cobranca["id"]))
+            if cobranca["boleto_identificador"] and cheio != cobranca["valor_centavos"]:
+                pendencias.append(_pendencia_boleto_valor_antigo(con, quem, cobranca, cheio,
+                                                                 "com o contrato reaberto o valor é"))
+        auditar(con, quem, "reabrir_contrato", "contrato", contrato_id, motivo=motivo,
+                encerramento_desfeito=contrato["data_encerramento"], cobrancas_restauradas=len(restauradas))
+    gerar_cobrancas("sistema")
+    return {"cobrancas_restauradas": len(restauradas), "pendencias": pendencias}
 
 
 def apagar_contrato(quem, contrato_id):
@@ -469,7 +611,7 @@ def apagar_contrato(quem, contrato_id):
 
 
 # --- COBRANÇAS ---
-def _valor_vigente(con, contrato_id, data_iso):
+def valor_vigente(con, contrato_id, data_iso):
     """Valor que vale na data. Antes do primeiro registro (contrato antigo cadastrado com o valor
     atual), usa o mais antigo conhecido."""
     linha = con.execute(
@@ -495,7 +637,7 @@ def gerar_cobrancas(quem="sistema", hoje=None):
                 venc = regras.vencimento(competencia, dia)
                 if venc > limite or (fim and venc > fim):
                     break
-                valor = _valor_vigente(con, contrato["id"], venc.isoformat())
+                valor = valor_vigente(con, contrato["id"], venc.isoformat())
                 if valor:
                     cur = con.execute(
                         "INSERT OR IGNORE INTO cobrancas (contrato_id, competencia, vencimento, valor_centavos) "
@@ -623,7 +765,7 @@ def registrar_pagamento(quem, cobranca_id, data_pagamento, valor_centavos, forma
         contrato = _obter(con, "contratos", cobranca["contrato_id"], "Contrato")
         saldo = cobranca["valor_centavos"] - _pago(con, cobranca_id)
         multa, juros = regras.encargos(max(saldo, 0), contrato["multa_pct"], contrato["juros_mes_pct"],
-                                       para_data(cobranca["vencimento"]), data)
+                                       regras.vencimento_efetivo(para_data(cobranca["vencimento"])), data)
         esperado = max(saldo, 0) + multa + juros
         cur = con.execute(
             "INSERT INTO pagamentos (cobranca_id, data_pagamento, valor_centavos, forma, identificador_externo, "
@@ -653,14 +795,39 @@ def registrar_pagamento(quem, cobranca_id, data_pagamento, valor_centavos, forma
                 f"{rotulo}.",
                 "pagamento", pagamento_id,
             ))
-        if contrato["data_encerramento"]:
+        if (contrato["data_encerramento"] and data.isoformat() > contrato["data_encerramento"]
+                and cobranca["vencimento"] <= contrato["data_encerramento"]):  # dívida antiga paga por quem já saiu
             pendencias.append(_nova_pendencia(
                 con, quem, "contrato_encerrado",
-                f"Pagamento de {regras.formatar_reais(valor)} em contrato encerrado: {rotulo}.",
+                f"Pagamento de {regras.formatar_reais(valor)} recebido depois do encerramento do contrato "
+                f"({_data_br(contrato['data_encerramento'])}): {rotulo}.",
                 "pagamento", pagamento_id,
             ))
         return {"pagamento_id": pagamento_id, "cobranca_id": cobranca_id, "ja_existia": False,
                 "pendencias": pendencias}
+
+
+def _cobranca_do_boleto(con, identificador):
+    """A cobrança do boleto. Se o boleto foi trocado por uma segunda via, o antigo continua pagável no
+    banco: achamos a cobrança pelo registro de auditoria da troca."""
+    cobranca = con.execute("SELECT * FROM cobrancas WHERE boleto_identificador = ?", (identificador,)).fetchone()
+    if cobranca:
+        return cobranca
+    troca = con.execute(
+        "SELECT entidade_id FROM auditoria WHERE acao = 'registrar_boleto' AND instr(detalhes, ?) > 0 "
+        "ORDER BY id DESC LIMIT 1", (f'"boleto_anterior": {json.dumps(identificador)}',)).fetchone()
+    return con.execute("SELECT * FROM cobrancas WHERE id = ?", (troca["entidade_id"],)).fetchone() if troca else None
+
+
+def _pendencia_de_boleto(quem, tipo, identificador, descricao, cobranca_id=None):
+    """Pendência sobre um boleto que o banco diz ter sido pago; repetir a baixa não cria outra."""
+    with db.transacao() as con:
+        aberta = con.execute("SELECT id FROM pendencias WHERE tipo = ? AND resolvida_em IS NULL "
+                             "AND instr(descricao, ?) > 0", (tipo, identificador)).fetchone()
+        if aberta:
+            return {"registrado": False, "pendencia_id": aberta["id"]}
+        pendencia = _nova_pendencia(con, quem, tipo, descricao, "cobranca" if cobranca_id else None, cobranca_id)
+    return {"registrado": False, "pendencia_id": pendencia["pendencia_id"]}
 
 
 def registrar_pagamento_boleto(quem, identificador, data_pagamento, valor_centavos, comprovante_caminho=None):
@@ -671,25 +838,21 @@ def registrar_pagamento_boleto(quem, identificador, data_pagamento, valor_centav
             "SELECT id, cobranca_id FROM pagamentos WHERE identificador_externo = ? AND cancelado_em IS NULL",
             (identificador,),
         ).fetchone()
-        cobranca = con.execute("SELECT id FROM cobrancas WHERE boleto_identificador = ?", (identificador,)).fetchone()
+        cobranca = _cobranca_do_boleto(con, identificador)
+        rotulo = _rotulo_cobranca(con, cobranca) if cobranca else None
     if ja_pago:
         return {"registrado": True, "pagamento_id": ja_pago["id"], "cobranca_id": ja_pago["cobranca_id"],
                 "ja_existia": True, "pendencias": []}
+    informado = (f"O banco informou pagamento de {regras.formatar_reais(int(valor_centavos))} em "
+                 f"{para_data(data_pagamento).isoformat()} do boleto {identificador}")
     if cobranca is None:
-        with db.transacao() as con:
-            aberta = con.execute(
-                "SELECT id FROM pendencias WHERE tipo = 'boleto_desconhecido' AND resolvida_em IS NULL "
-                "AND descricao LIKE ?", (f"%{identificador}%",),
-            ).fetchone()
-            if aberta:
-                return {"registrado": False, "pendencia_id": aberta["id"]}
-            pendencia = _nova_pendencia(
-                con, quem, "boleto_desconhecido",
-                f"O banco informou pagamento de {regras.formatar_reais(int(valor_centavos))} em "
-                f"{para_data(data_pagamento).isoformat()} do boleto {identificador}, que não está em nenhuma "
-                "cobrança do sistema.",
-            )
-        return {"registrado": False, "pendencia_id": pendencia["pendencia_id"]}
+        return _pendencia_de_boleto(quem, "boleto_desconhecido", identificador,
+                                    f"{informado}, que não está em nenhuma cobrança do sistema.")
+    if cobranca["situacao"] != "normal":  # o dinheiro entrou, mas a cobrança não recebe mais pagamento
+        return _pendencia_de_boleto(
+            quem, "pagamento_sem_cobranca", identificador,
+            f"{informado}, mas a cobrança ({rotulo}) está {cobranca['situacao']}. O dinheiro entrou: "
+            "decida se devolve ao locatário ou se reativa a cobrança.", cobranca["id"])
     resultado = registrar_pagamento(quem, cobranca["id"], data_pagamento, valor_centavos, "boleto",
                                     identificador_externo=identificador, comprovante_caminho=comprovante_caminho)
     return {"registrado": True, **resultado}

@@ -19,6 +19,11 @@ from zoneinfo import ZoneInfo
 
 from sistema import config, db
 
+try:
+    from sistema.modulos import backup as aviso
+except ImportError:  # módulo opcional removido: o backup funciona igual, só sem o aviso no painel
+    aviso = None
+
 PREFIXO = "backup-alugueis-"
 
 
@@ -26,7 +31,31 @@ def _log(texto):
     print(f"{datetime.now(ZoneInfo(config.TZ)):%Y-%m-%d %H:%M:%S} {texto}", flush=True)
 
 
+def _registrar(**dados):
+    """Guarda o resultado para o painel mostrar (módulo opcional; sem ele, só segue)."""
+    if aviso is None:
+        return
+    try:
+        aviso.gravar(**dados)
+    except Exception as erro:  # noqa: BLE001 — o aviso nunca pode derrubar o backup
+        _log(f"Não consegui gravar o status do backup: {erro}")
+
+
 def fazer_backup():
+    arquivo = None
+    try:
+        arquivo = _fazer_copia_local()
+        if config.RCLONE_DESTINO:
+            _enviar(arquivo)
+    except Exception as erro:
+        _registrar(ok=False, arquivo=arquivo.name if arquivo else None,
+                   drive=False if arquivo and config.RCLONE_DESTINO else None, erro=str(erro)[:200])
+        raise
+    _registrar(ok=True, arquivo=arquivo.name, drive=True if config.RCLONE_DESTINO else None)
+    return arquivo
+
+
+def _fazer_copia_local():
     pasta = Path(config.BACKUP_DIR)
     pasta.mkdir(parents=True, exist_ok=True)
     nome = f"{PREFIXO}{datetime.now(ZoneInfo(config.TZ)):%Y-%m-%d-%H%M}.tar.gz"
@@ -47,8 +76,6 @@ def fazer_backup():
                 tar.add(config.DOCS_DIR, arcname="documentos")
     _log(f"Backup local criado: {arquivo} ({arquivo.stat().st_size // 1024} KB)")
     _limpar_local(pasta)
-    if config.RCLONE_DESTINO:
-        _enviar(arquivo)
     return arquivo
 
 
@@ -59,6 +86,14 @@ def _limpar_local(pasta):
 
 
 def _enviar(arquivo):
+    try:
+        _enviar_ao_drive(arquivo)
+    except (OSError, subprocess.CalledProcessError) as erro:
+        raise RuntimeError("não consegui copiar para o Google Drive (rclone). Se foi a autorização que "
+                           f"venceu, refaça o passo do rclone em docs/instalacao-servidor.md. Detalhe: {erro}") from erro
+
+
+def _enviar_ao_drive(arquivo):
     destino = config.RCLONE_DESTINO
     subprocess.run(["rclone", "copy", str(arquivo), destino], check=True)
     _log(f"Enviado para {destino}")
@@ -82,6 +117,11 @@ def main():
         fazer_backup()
         return
     _log(f"Backup diário ativo às {config.BACKUP_HORA}h.")
+    if aviso is not None and aviso.precisa_agora():  # servidor novo ou que ficou desligado
+        try:
+            fazer_backup()
+        except Exception as erro:  # noqa: BLE001
+            _log(f"ERRO no backup: {erro}")
     while True:
         time.sleep(_segundos_ate_proximo())
         try:

@@ -64,7 +64,8 @@ def alertas() -> dict:
 @mcp.tool()
 def listar_imoveis(situacao: str | None = None) -> dict:
     """Lista os imóveis com situação calculada e locatário atual.
-    situacao (opcional): 'alugado', 'vago' ou 'em_manutencao'."""
+    situacao (opcional): 'alugado', 'reservado' (contrato ativo que ainda não começou), 'vago' ou
+    'em_manutencao'."""
     return _lista(consultas.listar_imoveis(situacao))
 
 
@@ -224,9 +225,11 @@ def registrar_reajuste(contrato_id: int, novo_valor: str, vigente_desde: str, mo
     no histórico. Cobranças futuras sem boleto e sem pagamento passam a ter o valor novo.
     Se existir a ferramenta sugerir_reajuste, use-a para calcular. SÓ registre depois que o
     Paulo aprovar. Para não
-    reajustar naquele ano, registre o mesmo valor (motivo 'sem reajuste')."""
-    servicos.registrar_reajuste(HERMES, contrato_id, _centavos(novo_valor, "novo valor"), vigente_desde, motivo)
-    return {"ok": True}
+    reajustar naquele ano, registre o mesmo valor (motivo 'sem reajuste'). Se a resposta trouxer
+    'pendencias' (boleto já emitido com o valor antigo), avise o Paulo."""
+    resultado = servicos.registrar_reajuste(HERMES, contrato_id, _centavos(novo_valor, "novo valor"),
+                                            vigente_desde, motivo)
+    return {"ok": True, **resultado}
 
 
 @mcp.tool()
@@ -234,17 +237,21 @@ def renovar_contrato(contrato_id: int, nova_data_fim: str, novo_valor: str | Non
                      vigente_desde: str | None = None) -> dict:
     """Renova o mesmo contrato com nova data de fim (AAAA-MM-DD). Se houver novo valor, ele
     vale a partir de vigente_desde (padrão: dia seguinte ao fim atual)."""
-    servicos.renovar_contrato(HERMES, contrato_id, nova_data_fim, _centavos(novo_valor, "novo valor"),
-                              vigente_desde)
-    return {"ok": True}
+    resultado = servicos.renovar_contrato(HERMES, contrato_id, nova_data_fim, _centavos(novo_valor, "novo valor"),
+                                          vigente_desde)
+    return {"ok": True, **resultado}
 
 
 @mcp.tool()
-def encerrar_contrato(contrato_id: int, data_encerramento: str, motivo: str) -> dict:
+def encerrar_contrato(contrato_id: int, data_encerramento: str, motivo: str, cobrar_ate_a_saida: bool) -> dict:
     """Encerra um contrato (AAAA-MM-DD). Cobranças que vencem depois e não foram pagas são
     canceladas; se alguma tinha boleto, é criada pendência para cancelar no banco. Dívidas
-    anteriores continuam em aberto."""
-    return servicos.encerrar_contrato(HERMES, contrato_id, data_encerramento, motivo)
+    anteriores continuam em aberto.
+    PERGUNTE ao Paulo antes: este contrato cobra o aluguel DEPOIS do uso (o aluguel de março vence em
+    abril)? Se sim, use cobrar_ate_a_saida=true: a cobrança do mês seguinte à saída é mantida com o
+    valor proporcional aos dias usados (a resposta traz 'ultima_cobranca'). Se o aluguel é pago no
+    próprio mês ou adiantado, use false: nada é cobrado depois da saída."""
+    return servicos.encerrar_contrato(HERMES, contrato_id, data_encerramento, motivo, cobrar_ate_a_saida)
 
 
 # ============ BOLETOS E PAGAMENTOS ============

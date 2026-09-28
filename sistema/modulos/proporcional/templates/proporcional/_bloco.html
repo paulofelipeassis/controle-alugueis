@@ -1,0 +1,16 @@
+{# Pergunta sobre o primeiro período, na página do contrato. Espera: c (o contrato). #}
+{% set p = sugestao_proporcional(c.id) %}
+{% if p %}
+<div class="msg aviso">
+  <strong>Primeira cobrança: aluguel cheio ou proporcional?</strong><br>
+  O contrato começou em {{ p.inicio|data }} e a primeira cobrança (vence {{ p.vencimento|data }}) está com o aluguel cheio, {{ p.valor_cheio }}.
+  Se ela deve cobrar só os dias usados em {{ p.mes_do_inicio|comp }} ({{ p.dias }} de {{ p.dias_do_mes }} dias), o valor seria <strong>{{ p.valor_sugerido }}</strong>.
+  Decida antes de o boleto ser emitido.
+  <div class="acoes" style="margin-top: 0.75rem">
+    <form method="post" action="/contratos/{{ c.id }}/primeiro-periodo"><input type="hidden" name="escolha" value="proporcional">
+      <button type="submit">Usar {{ p.valor_sugerido }}</button></form>
+    <form method="post" action="/contratos/{{ c.id }}/primeiro-periodo"><input type="hidden" name="escolha" value="cheio">
+      <button type="submit" class="outline">Manter {{ p.valor_cheio }}</button></form>
+  </div>
+</div>
+{% endif %}

@@ -5,7 +5,8 @@
 <form method="post">
   {% if editar %}
   <p><strong>{{ dados.imovel_nome }} — {{ dados.locatario_nome }}</strong><br>
-  <small>Datas, dia de vencimento e valor não mudam por aqui: use renovar, reajuste ou encerrar na página do contrato.</small></p>
+  <small>Início, dia de vencimento e valor não mudam por aqui: use reajuste, renovar ou encerrar na página do contrato. Se algum deles foi cadastrado errado e ainda não há pagamento nem boleto, apague o contrato e cadastre de novo.</small></p>
+  {{ campo("data_fim_prevista", "Fim previsto (correção)", dados, tipo="date") }}
   {% else %}
   <label>Imóvel (vago ou em manutenção) *
     <select name="imovel_id" required>

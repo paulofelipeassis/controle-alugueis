@@ -40,13 +40,15 @@ def test_atraso_sem_encargos_vira_pendencia(cenario):
     out = _cobranca(cenario["contrato"], "2026-10")
     r = servicos.registrar_pagamento("t", out, "2026-10-20", 150000, "pix")
     assert r["pendencias"][0]["tipo"] == "pagamento_divergente"
-    assert "R$ 1.535,00" in r["pendencias"][0]["descricao"]  # 1500 + 2% + 1% × 10/30
+    # Venceu sábado 10/10 e segunda 12/10 é feriado: a contagem começa no dia útil, terça 13/10.
+    # 7 dias de atraso: 1500 + 2% + 1% × 7/30 = R$ 1.533,50
+    assert "R$ 1.533,50" in r["pendencias"][0]["descricao"]
     assert _situacao(cenario["contrato"], "2026-10", "2026-10-25")[0] == "paga"
 
 
 def test_atraso_com_encargos_sem_pendencia(cenario):
     servicos.gerar_cobrancas("t", "2026-10-01")
-    r = servicos.registrar_pagamento("t", _cobranca(cenario["contrato"], "2026-10"), "2026-10-20", 153500, "boleto")
+    r = servicos.registrar_pagamento("t", _cobranca(cenario["contrato"], "2026-10"), "2026-10-20", 153350, "boleto")
     assert r["pendencias"] == []
 
 

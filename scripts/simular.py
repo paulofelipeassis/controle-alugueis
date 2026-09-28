@@ -71,6 +71,7 @@ class Simulacao:
         self.boletos_emitidos = 0
         self.baixas_repetidas = 0
         self.perfil = {}             # contrato_id -> perfil
+        self.final_ate_a_saida = None
 
     # --- utilidades ---
     def log(self, texto):
@@ -149,10 +150,14 @@ class Simulacao:
         valor = cb["saldo_centavos"]
         perfil = self.perfil[cb["contrato_id"]]
         if perfil == "pontual":
-            self.agendar(venc - timedelta(days=self.rng.randint(0, 3)), cb["id"], valor, "boleto", identificador)
+            if self.rng.random() < 0.4:  # paga no último dia possível: o dia útil do vencimento (sem encargos)
+                self.agendar(regras.vencimento_efetivo(venc), cb["id"], valor, "boleto", identificador)
+            else:
+                self.agendar(venc - timedelta(days=self.rng.randint(0, 3)), cb["id"], valor, "boleto", identificador)
         elif perfil == "atrasa_com_juros":
             dia = venc + timedelta(days=self.rng.randint(3, 20))
-            multa, juros = regras.encargos(valor, cb["multa_pct"], cb["juros_mes_pct"], venc, dia)
+            multa, juros = regras.encargos(valor, cb["multa_pct"], cb["juros_mes_pct"],
+                                           regras.vencimento_efetivo(venc), dia)
             self.agendar(dia, cb["id"], valor + multa + juros, "boleto", identificador)
         elif perfil == "atrasa_sem_juros":
             self.agendar(venc + timedelta(days=self.rng.randint(3, 10)), cb["id"], valor, "pix", f"E2E{cb['id']}")
@@ -206,6 +211,19 @@ class Simulacao:
             self.cancelar_agendados_do_contrato(contrato)
             self.log(f"contrato encerrado; {r['cobrancas_canceladas']} cobrança(s) cancelada(s), "
                      f"{len(r['pendencias'])} pendência(s)")
+        if d == date(2027, 5, 15):  # locatário pontual sai no meio do mês; o aluguel dele é pago depois do uso
+            contrato = self.contratos[1]
+            cheio = consultas.extrato_contrato(contrato, hoje=d)["valor_atual_centavos"]
+            r = servicos.encerrar_contrato("paulo", contrato, "2027-05-15", "mudou de cidade", cobrar_ate_a_saida=True)
+            ultima = r["ultima_cobranca"]
+            # Saiu dia 15 de maio (31 dias): a cobrança que vence em junho cobre 15/31 do aluguel.
+            self.conferir(ultima["competencia"] == "2027-06" and ultima["dias"] == 15
+                          and ultima["valor_centavos"] == regras.valor_proporcional(cheio, 15, 31),
+                          "cobrança final proporcional errada")
+            self.conferir(r["cobrancas_mantidas"] == 1 and r["pendencias"] == [],
+                          "encerramento cobrando até a saída mexeu no que não devia")
+            self.final_ate_a_saida = (contrato, ultima["id"])
+            self.log(f"contrato encerrado cobrando até a saída: {ultima['valor']} em {ultima['vencimento'][8:]}/06")
         if d == date(2027, 4, 15):  # o ex-locatário paga, por PIX, o mês mais antigo que deve
             cb = [c for c in consultas.listar_cobrancas(contrato_id=self.contratos[8], hoje=d)
                   if c["situacao_calculada"] == "atrasada"][0]
@@ -278,7 +296,8 @@ class Simulacao:
         imoveis = consultas.listar_imoveis()
         ativos = {c["imovel_id"] for c in consultas.listar_contratos(ativos=True, hoje=d)}
         for im in imoveis:
-            self.conferir((im["situacao"] == "alugado") == (im["id"] in ativos), f"situação do imóvel {im['id']}")
+            self.conferir((im["situacao"] in ("alugado", "reservado")) == (im["id"] in ativos),
+                          f"situação do imóvel {im['id']}")
         atrasado = sum(cb["saldo_centavos"] for cb in todas if cb["situacao_calculada"] == "atrasada")
         self.conferir(painel["total_atrasado_centavos"] == atrasado, "total atrasado do painel não bate")
         comp = regras.competencia_de(d)
@@ -320,7 +339,17 @@ class Simulacao:
         self.conferir(esperados <= tipos, f"faltaram pendências dos tipos {esperados - tipos}")
         alertas = consultas.alertas(hoje=self.hoje)
         self.conferir(any(a["tipo"] == "prazo_vencido" for a in alertas), "contrato com prazo vencido sem alerta")
+        with db.leitura() as con:  # quem paga em dia (mesmo no dia útil do vencimento) nunca vira 'pagamento diferente'
+            falsos = con.execute(
+                "SELECT COUNT(*) FROM pendencias pe JOIN pagamentos pg ON pe.entidade = 'pagamento' AND pe.entidade_id = pg.id "
+                "JOIN cobrancas cb ON cb.id = pg.cobranca_id WHERE pe.tipo = 'pagamento_divergente' AND cb.contrato_id IN (%s)"
+                % ",".join(str(c) for c, p in self.perfil.items() if p == "pontual")).fetchone()[0]
+        self.conferir(falsos == 0, f"{falsos} pendência(s) falsa(s) para locatários pontuais")
+        contrato, cobranca_id = self.final_ate_a_saida
+        final = [c for c in consultas.listar_cobrancas(contrato_id=contrato, hoje=self.hoje) if c["id"] == cobranca_id][0]
+        self.conferir(final["situacao_calculada"] == "paga", "a cobrança final até a saída não foi paga")
         devedores = {g["contrato_id"] for g in consultas.inadimplentes(hoje=self.hoje)}
+        self.conferir(contrato not in devedores, "quem saiu pagando tudo aparece como devedor")
         self.conferir(self.contratos[8] in devedores, "dívida do contrato encerrado sumiu dos inadimplentes")
 
 

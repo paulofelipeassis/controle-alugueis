@@ -2,7 +2,7 @@
 import calendar
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
@@ -64,6 +64,11 @@ def competencia_de(data):
     return f"{data.year:04d}-{data.month:02d}"
 
 
+def dias_do_mes(competencia):
+    ano, mes = map(int, competencia.split("-"))
+    return calendar.monthrange(ano, mes)[1]
+
+
 def proxima_competencia(competencia):
     ano, mes = map(int, competencia.split("-"))
     return competencia_de(somar_meses(date(ano, mes, 1), 1))
@@ -81,6 +86,54 @@ def primeira_competencia(data_inicio, dia_vencimento, inicio_cobrancas):
     if vencimento(competencia, dia_vencimento) < data_inicio:
         competencia = proxima_competencia(competencia)
     return max(competencia, inicio_cobrancas)
+
+
+# --- DIA ÚTIL ---
+# Vencimento que cai em dia sem expediente bancário (fim de semana ou feriado) vale até o dia útil
+# seguinte, sem multa nem juros: regra dos boletos bancários, e o Código Civil (art. 132, §1º)
+# prorroga para o dia útil seguinte o prazo que vence em feriado.
+def pascoa(ano):
+    """Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher, calendário gregoriano)."""
+    a = ano % 19
+    b, c = divmod(ano, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    mes, dia = divmod(h + ell - 7 * m + 114, 31)
+    return date(ano, mes, dia + 1)
+
+
+def feriados(ano):
+    """Feriados nacionais e dias sem expediente bancário no ano, mais os de config.FERIADOS_EXTRAS."""
+    dias = {date(ano, m, d) for m, d in [(1, 1), (4, 21), (5, 1), (9, 7), (10, 12), (11, 2), (11, 15), (12, 25)]}
+    if ano >= 2024:  # Dia da Consciência Negra virou feriado nacional (Lei 14.759/2023)
+        dias.add(date(ano, 11, 20))
+    p = pascoa(ano)
+    dias |= {p - timedelta(days=48), p - timedelta(days=47),  # carnaval (segunda e terça)
+             p - timedelta(days=2),                           # sexta-feira santa
+             p + timedelta(days=60)}                          # corpus christi
+    for item in filter(None, (x.strip() for x in config.FERIADOS_EXTRAS.split(","))):
+        try:
+            partes = [int(x) for x in item.split("-")]
+            dias.add(date(ano, *partes) if len(partes) == 2 else date(*partes))
+        except ValueError:
+            raise ErroDeNegocio(f"FERIADOS_EXTRAS inválido: '{item}'. Use MM-DD ou AAAA-MM-DD.") from None
+    return dias
+
+
+def dia_util(data):
+    return data.weekday() < 5 and data not in feriados(data.year)
+
+
+def vencimento_efetivo(data):
+    """Último dia para pagar sem multa e juros: o próprio vencimento, ou o primeiro dia útil depois dele."""
+    while not dia_util(data):
+        data += timedelta(days=1)
+    return data
 
 
 # --- DINHEIRO (sempre em centavos, inteiro) ---
@@ -102,6 +155,12 @@ def reais_para_centavos(valor, campo="valor"):
     if reais < 0:
         raise ErroDeNegocio(f"{maiuscula(campo)} não pode ser negativo.")
     return int((reais * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def valor_proporcional(valor_centavos, dias, dias_no_mes):
+    """Aluguel proporcional aos dias usados do mês (dias corridos, do mês civil), em centavos."""
+    dias = max(0, min(int(dias), int(dias_no_mes)))
+    return int((Decimal(int(valor_centavos)) * dias / int(dias_no_mes)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def formatar_reais(centavos):
@@ -173,9 +232,10 @@ def situacao_cobranca(situacao, valor, pago, vencimento_, hoje_):
     return "em_aberto"
 
 
-def situacao_imovel(tem_contrato_ativo, em_manutencao):
+def situacao_imovel(tem_contrato_ativo, em_manutencao, inicio_no_futuro=False):
+    """'reservado' = tem contrato ativo que ainda não começou (o imóvel segue vago até a data de início)."""
     if tem_contrato_ativo:
-        return "alugado"
+        return "reservado" if inicio_no_futuro else "alugado"
     return "em_manutencao" if em_manutencao else "vago"
 
 
@@ -189,6 +249,11 @@ def validar_cpf_cnpj(texto):
     if len(digitos) not in (11, 14):
         raise ErroDeNegocio(f"CPF/CNPJ inválido: '{texto}'. O CPF tem 11 dígitos e o CNPJ tem 14.")
     return digitos
+
+
+def chave_nome(texto):
+    """Forma de comparar nomes ignorando acento, maiúscula e pontuação ('Anel Viário' = 'anel viario')."""
+    return nome_pasta(texto).casefold()
 
 
 def nome_pasta(texto):

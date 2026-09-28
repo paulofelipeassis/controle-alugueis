@@ -17,3 +17,8 @@ BACKUP_DIR = os.environ.get("BACKUP_DIR", "dados/backups")
 RCLONE_DESTINO = os.environ.get("RCLONE_DESTINO", "")
 BACKUP_MANTER = int(os.environ.get("BACKUP_MANTER", "14"))
 BACKUP_HORA = int(os.environ.get("BACKUP_HORA", "3"))
+# Feriados que o sistema não conhece (municipais, ou dias sem expediente bancário): lista separada por
+# vírgula, cada item 'MM-DD' (todo ano) ou 'AAAA-MM-DD'. Ex.: "10-24,12-31".
+FERIADOS_EXTRAS = os.environ.get("FERIADOS_EXTRAS", "")
+# 1 quando o site é acessado por HTTPS (servidor): o cookie de login só viaja por conexão segura.
+COOKIE_SEGURO = os.environ.get("COOKIE_SEGURO", "0") == "1"

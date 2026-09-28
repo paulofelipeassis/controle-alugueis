@@ -37,7 +37,10 @@ def caminho_relativo(caminho, exigir_arquivo=True):
 
 
 def caminho_absoluto(relativo):
-    return raiz() / caminho_relativo(relativo, exigir_arquivo=False)
+    absoluto = raiz() / caminho_relativo(relativo, exigir_arquivo=False)
+    if not absoluto.resolve().is_relative_to(raiz()):  # link simbólico apontando para fora da pasta
+        raise ErroDeNegocio(f"Caminho inválido: '{relativo}'.")
+    return absoluto
 
 
 def pasta(entidade, entidade_id):

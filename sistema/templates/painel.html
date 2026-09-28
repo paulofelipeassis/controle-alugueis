@@ -2,12 +2,13 @@
 {% from "_macros.html" import selo %}
 {% block conteudo %}
 <h2>Painel</h2>
+{% if modulo_ativo("backup") %}{% include "backup/_faixa.html" %}{% endif %}
 {% if p.pendencias_abertas %}
 <div class="msg aviso"><a href="/pendencias"><strong>{{ p.pendencias_abertas }} pendência(s)</strong> para conferir →</a></div>
 {% endif %}
 <div class="numeros">
   <article><small>Ocupação</small><strong>{{ p.ocupacao_pct }}%</strong>
-    <small>{{ p.imoveis_alugados }} alugados, {{ p.imoveis_vagos }} vagos{% if p.imoveis_em_manutencao %}, {{ p.imoveis_em_manutencao }} em manutenção{% endif %}</small></article>
+    <small>{{ p.imoveis_alugados }} alugados, {{ p.imoveis_vagos }} vagos{% if p.imoveis_reservados %}, {{ p.imoveis_reservados }} reservados{% endif %}{% if p.imoveis_em_manutencao %}, {{ p.imoveis_em_manutencao }} em manutenção{% endif %}</small></article>
   <article><small>Devido em {{ p.resumo_do_mes.competencia|comp }}</small><strong>{{ p.resumo_do_mes.devido }}</strong></article>
   <article><small>Recebido no mês</small><strong>{{ p.resumo_do_mes.recebido }}</strong></article>
   <article><small>Falta receber no mês</small><strong>{{ p.resumo_do_mes.falta_receber }}</strong></article>
@@ -48,9 +49,9 @@
     marker: {color: "#1e88e5"}
   }], {title: {text: "Recebido por mês"}, margin: {t: 40, l: 50, r: 10, b: 60}, yaxis: {tickprefix: "R$ "}}, config);
   Plotly.newPlot("grafico-imoveis", [{
-    type: "pie", hole: 0.5, labels: ["Alugados", "Vagos", "Em manutenção"],
-    values: [{{ p.imoveis_alugados }}, {{ p.imoveis_vagos }}, {{ p.imoveis_em_manutencao }}],
-    marker: {colors: ["#43a047", "#1e88e5", "#fb8c00"]}
+    type: "pie", hole: 0.5, labels: ["Alugados", "Reservados", "Vagos", "Em manutenção"],
+    values: [{{ p.imoveis_alugados }}, {{ p.imoveis_reservados }}, {{ p.imoveis_vagos }}, {{ p.imoveis_em_manutencao }}],
+    marker: {colors: ["#43a047", "#7e57c2", "#1e88e5", "#fb8c00"]}
   }], {title: {text: "Imóveis"}, margin: {t: 40, l: 10, r: 10, b: 10}}, config);
 </script>
 {% endblock %}

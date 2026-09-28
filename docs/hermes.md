@@ -17,6 +17,8 @@ para uma pessoa olhar, em vez de adivinhar.
 
 - Valores em reais, como texto no formato brasileiro: `"1.500,00"`.
 - Datas: `AAAA-MM-DD` (ex.: `2026-10-10`).
+- Vencimento em sábado, domingo ou feriado vale até o dia útil seguinte, sem multa nem juros (o
+  sistema já considera isso: `vencimento_efetivo`). No boleto do banco, use o vencimento do contrato.
 - Listas vêm como `{"quantidade": N, "itens": [...]}`. `quantidade: 0` quer dizer que não
   há nada (por exemplo, nenhuma pendência), não que houve erro.
 - Competência (mês da cobrança): `AAAA-MM`. A cobrança de outubro é a que **vence** em
@@ -30,6 +32,8 @@ para uma pessoa olhar, em vez de adivinhar.
 1. `cobrancas_sem_boleto`: traz o que precisa de boleto, já com nome, CPF/CNPJ, e-mail,
    valor, vencimento, multa e juros do contrato. Pule as que têm `reajuste_pendente: true`
    (veja "Reajuste anual").
+   Se `data_encerramento` vier preenchido (contrato encerrado, dívida antiga), **não emita** sem
+   perguntar ao Paulo.
 2. Emitir cada boleto no banco (hoje a Caixa), com a multa e os juros informados.
 3. `registrar_boleto` com o nosso número (`identificador`), a linha digitável e o link.
 4. Enviar o boleto por e-mail ao locatário.
@@ -40,7 +44,10 @@ para uma pessoa olhar, em vez de adivinhar.
 2. Conferir no banco quais foram pagos.
 3. Para cada pago: `registrar_pagamento_boleto` com o identificador, a data e o valor que o
    banco informou. Pode repetir sem medo: o mesmo boleto nunca vira dois pagamentos.
-4. Se a resposta trouxer `pendencias` ou `registrado: false`, avise o Paulo.
+4. Se a resposta trouxer `pendencias` ou `registrado: false`, avise o Paulo. `registrado: false`
+   quer dizer que o dinheiro entrou mas o sistema não conseguiu ligá-lo a uma cobrança (boleto
+   desconhecido, ou cobrança isentada ou cancelada): uma pendência foi criada, não faça mais nada.
+5. Boleto de segunda via: o antigo continua pagável no banco e o sistema reconhece a baixa dele.
 
 ### Todo dia: avisos
 `alertas` e `inadimplentes`. Sugestão: mandar ao Paulo um resumo curto só quando houver
@@ -60,7 +67,8 @@ novidade (atraso novo, contrato terminando, reajuste chegando, pendência nova).
 ### Cadastros
 - Antes de cadastrar um locatário, `buscar_locatarios` para não duplicar.
 - Ordem: `cadastrar_imovel` → `cadastrar_locatario` → `criar_contrato`. As cobranças são
-  criadas sozinhas.
+  criadas sozinhas. Imóvel com contrato que ainda não começou aparece como `reservado` em
+  `listar_imoveis` (não conta na ocupação até a data de início).
 - **Contratos que já existem:** use a data de início verdadeira, o valor **atual** do aluguel e
   `valor_vigente_desde` = data do último reajuste (desde quando vale o valor atual). Isso é
   obrigatório se o contrato começou há mais de 1 ano. Se não souber a data, pergunte ao Paulo:
@@ -82,13 +90,31 @@ Os `alertas` avisam quando um contrato faz aniversário. Sugestão:
 ### Renovação e encerramento
 - `renovar_contrato`, `encerrar_contrato`. Confirme com o Paulo
   antes: são decisões dele. Você só executa.
-- Ao encerrar, se a resposta trouxer pendências de "cancelar boleto", cancele o boleto no
-  banco e avise o Paulo.
+- **`encerrar_contrato` exige `cobrar_ate_a_saida`, e é o Paulo quem responde:** "Este contrato cobra o
+  aluguel depois do uso (o aluguel de março vence em abril) ou no próprio mês/adiantado?". Depois do
+  uso → `true`: a cobrança do mês seguinte à saída fica, proporcional aos dias usados (a resposta traz
+  `ultima_cobranca`; emita o boleto dela normalmente, o `motivo_situacao` dela começa com "última
+  cobrança"). No próprio mês ou adiantado → `false`: nada é cobrado depois da saída.
+- Ao encerrar, se a resposta trouxer pendências de "cancelar boleto" (ou de boleto com valor antigo),
+  cancele/substitua o boleto no banco e avise o Paulo.
+
+### Contrato que começou no meio do mês (primeiro período)
+Depois de `criar_contrato` de um contrato que começa depois do dia 1, `alertas` traz
+`primeiro_periodo_proporcional`. **Antes de emitir o primeiro boleto**, `sugerir_primeiro_periodo`,
+mostre ao Paulo o valor sugerido (dias usados do mês do início) e pergunte: primeiro aluguel
+proporcional ou cheio? Só depois do "sim" dele: `decidir_primeiro_periodo` (`true` aplica o valor
+proporcional na primeira cobrança; `false` mantém o cheio). Não decida sozinho: cada contrato cobra
+do seu jeito.
+
+### Caução
+Quando um contrato com caução é encerrado, `alertas` traz `caucao_a_devolver` até alguém registrar a
+devolução na página do contrato (só pessoas: envolve descontos por danos). Lembre o Paulo do aviso;
+não registre você.
 
 ## O que você não faz (só pessoas, pela web)
 
 Cancelar pagamento, isentar ou cancelar cobrança, mudar valor de cobrança, resolver
-pendência, apagar qualquer coisa. Se achar que alguma dessas é necessária, crie uma
+pendência, reabrir contrato, registrar devolução de caução, baixar planilhas, apagar qualquer coisa. Se achar que alguma dessas é necessária, crie uma
 pendência explicando.
 
 ## Erros

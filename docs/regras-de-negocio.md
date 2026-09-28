@@ -45,9 +45,12 @@ O **como construir** está em [`plano-de-implementacao.md`](plano-de-implementac
 Grupo (ex.: "Anel Viário"), unidade (ex.: "Apto 101"), endereço, IPTU anual, nº do medidor
 Saneago, nº do medidor Enel, observações, e uma marcação **"em manutenção"**.
 
-- Grupo + unidade não se repetem.
-- Situação calculada: **Alugado** se tem contrato ativo; senão **Em manutenção** se marcado;
-  senão **Vago**.
+- Grupo + unidade não se repetem, **nem com outra grafia** ("Anel Viário" e "Anel Viario", maiúsculas
+  e espaços a mais contam como o mesmo imóvel): as pastas de documentos usam o nome sem acento e se
+  misturariam.
+- Situação calculada: **Alugado** se tem contrato ativo que já começou; **Reservado** se o contrato
+  ativo ainda não começou (o imóvel continua vago até a data de início e não entra na ocupação);
+  senão **Em manutenção** se marcado; senão **Vago**.
 
 ### Locatário (novo — antes os dados ficavam dentro do contrato)
 Nome, **CPF ou CNPJ** (só números, 11 ou 14 dígitos, não se repete), telefone, **e-mail
@@ -65,7 +68,8 @@ por falhas do contrato. Contrato pode ter corretor ou não.
 
 ### Usuário
 Login próprio para cada pessoa (nome, login, senha). Todos com acesso total. Sem níveis de
-permissão.
+permissão. Depois de 5 senhas erradas seguidas no mesmo login, o login fica bloqueado por 15
+minutos. Senha esquecida: quem cuida do servidor troca pelo terminal (`docs/instalacao-servidor.md`).
 
 ## 4. Contrato
 
@@ -112,9 +116,27 @@ Regras:
   último reajuste). Esta última é obrigatória se o contrato começou há mais de 1 ano, porque é
   dela que sai o próximo reajuste. Não são geradas cobranças de meses anteriores a
   `INICIO_COBRANCAS`, então não aparecem dívidas antigas.
-- **Encerrar** = informar data e motivo. As cobranças com vencimento depois do encerramento
-  e sem pagamento são canceladas. Se alguma já tinha boleto emitido, o sistema cria uma
-  **pendência** "cancelar boleto no banco". Dívidas anteriores continuam em aberto.
+- **Encerrar** = informar data, motivo e **como o contrato cobra o aluguel** (escolha obrigatória,
+  para ninguém deixar de cobrar sem perceber):
+  - **Depois de usar o imóvel** (o aluguel de março vence em abril; é o padrão da Lei do Inquilinato,
+    art. 23, I, e a regra do art. 20 só permite exigir adiantado em casos específicos): o sistema mantém
+    a cobrança do mês seguinte ao da saída, com o valor **proporcional aos dias usados** (dias corridos
+    do mês da saída; mês completo se a saída é no último dia), e cancela as demais que vencem depois.
+    Se a saída é antes do dia do vencimento, a cobrança que vence ainda no mês da saída também fica
+    (ela cobre o mês anterior, inteiro), e a do mês seguinte cobre só os dias usados.
+  - **No próprio mês ou adiantado**: as cobranças que vencem depois da saída e não têm pagamento são
+    canceladas, sem cobrar nada mais.
+  Se alguma cobrança cancelada já tinha boleto emitido, o sistema cria uma **pendência** "cancelar
+  boleto no banco"; se a cobrança final mantida já tinha boleto com o valor cheio, a pendência é "boleto
+  com valor antigo". Dívidas anteriores continuam em aberto. A última cobrança mantida aparece com o
+  motivo "última cobrança (até a saída): X de Y dias". Contrato encerrado não pede mais reajuste anual.
+- **Reabrir** um contrato encerrado por engano (ou com a data errada): só pessoas, pela web, com
+  motivo. O contrato volta a ficar ativo e as cobranças que o encerramento cancelou voltam a valer;
+  as que tinham boleto viram pendência ("o boleto pode ter sido cancelado no banco"). Não reabre se
+  o imóvel já tem outro contrato ativo.
+- A **data de fim prevista** pode ser corrigida a qualquer momento (para mais ou para menos). Início,
+  dia de vencimento e valor não se corrigem: se foram cadastrados errados e ainda não há pagamento
+  nem boleto, apaga-se o contrato e cadastra-se de novo.
 - Contrato cadastrado por engano pode ser apagado **só se** não tiver nenhum pagamento nem
   boleto.
 
@@ -127,7 +149,22 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
 - **Competência** = mês do vencimento. "A cobrança de outubro é a que vence em outubro."
 - **Vencimento** = dia de vencimento do contrato naquele mês. Se o mês não tem esse dia
   (29, 30, 31), vence no **último dia do mês**.
-- **Primeira cobrança** = o primeiro vencimento **a partir da data de início** do contrato.
+- **Vencimento em dia sem expediente bancário** (sábado, domingo, feriado nacional, Carnaval,
+  Sexta-feira Santa, Corpus Christi, e os dias de `FERIADOS_EXTRAS`): o locatário pode pagar até o
+  **primeiro dia útil seguinte** sem multa nem juros. A cobrança só fica atrasada, e a multa e os
+  juros só contam, a partir daí. Base: regra dos boletos bancários e Código Civil, art. 132, §1º
+  ("se o dia do vencimento cair em feriado, considerar-se-á prorrogado o prazo até o seguinte dia
+  útil"). Sem isso, o boleto pago na segunda-feira de um vencimento de sábado apareceria como
+  atrasado e geraria pendência falsa. Feriados municipais (ex.: 24/10 em Goiânia) entram em
+  `FERIADOS_EXTRAS`.
+- **Primeira cobrança** = o primeiro vencimento **a partir da data de início** do contrato, com o aluguel
+  cheio. Se o contrato começou no meio do mês, o módulo opcional `proporcional` pergunta (aviso no
+  painel e bloco na página do contrato, até alguém decidir) se ela deve cobrar só os dias usados do mês
+  do início, e mostra o valor. "Usar" aplica o valor na cobrança; "Manter" deixa o aluguel cheio e
+  silencia o aviso. Só se aplica a contrato que começa depois do dia 1, dentro do período em que o
+  sistema já cobra, e enquanto a cobrança está intocada (sem boleto, sem pagamento, valor do aluguel).
+  O sistema **nunca decide sozinho**: como cada contrato cobra o primeiro período é decisão de quem
+  conhece o contrato.
 - **Início das cobranças no sistema:** parâmetro `INICIO_COBRANCAS` (combinado: outubro de
   2026, `2026-10`). Nenhuma cobrança é gerada antes disso. Se o sistema entrar no ar mais
   tarde, o Paulo define o novo valor na hora (para não gerar como "atrasadas" cobranças que
@@ -160,7 +197,8 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
   API do banco (com multa e juros do contrato) → registra o boleto na cobrança → envia por
   e-mail ao locatário → marca como enviado.
 - Um boleto por cobrança. Segunda via / reemissão: registrar de novo com "substituir"; o
-  identificador antigo fica na auditoria.
+  identificador antigo fica na auditoria. **O boleto antigo continua pagável no banco**: se o banco
+  informar o pagamento dele, o sistema reconhece a cobrança pela auditoria e dá a baixa normalmente.
 - **Baixa:** o Hermes confere o banco **todo dia** (ou recebe aviso do banco, se a API
   oferecer) e registra o pagamento **pelo identificador do boleto**.
 - **Idempotente:** registrar o mesmo pagamento duas vezes não duplica (o identificador
@@ -183,9 +221,17 @@ caminho do comprovante (opcional), observação, quem registrou e quando.
   - o valor não bate com o esperado (diferença maior que R$ 1,00 do valor, ou do valor
     atualizado se atrasado);
   - a cobrança já estava paga (possível duplicidade);
-  - o contrato já está encerrado.
+  - o pagamento é **depois** da data de encerramento do contrato (dívida paga por quem já saiu). Pagar
+    antes ou na própria data de encerramento, inclusive com o encerramento registrado com antecedência,
+    não gera pendência.
 - Boleto pago que o sistema não conhece (identificador não encontrado): **não** registra
   pagamento, cria pendência "boleto desconhecido".
+- Boleto pago de uma cobrança já **isentada ou cancelada** (o banco não cancelou o boleto e o locatário
+  pagou): o pagamento não entra na cobrança, mas o dinheiro **não se perde**: vira pendência
+  "pagamento sem cobrança", para uma pessoa decidir entre devolver ou reativar. Repetir a baixa não
+  cria outra pendência.
+- Reajuste registrado depois de o boleto já ter sido emitido com o valor antigo: pendência
+  "boleto com valor antigo" (segunda via com o valor novo, ou cobrar a diferença depois).
 
 ## 8. Pendências
 
@@ -208,6 +254,22 @@ dizendo o que foi feito. Aparecem em destaque no painel.
 - A convenção foi enviada ao Hermes **como sugestão**: ele deve comparar com a estrutura
   que já usa e confirmar diferenças com o Paulo. Não dar ordens ao Hermes sobre isso.
 
+## 9b. Caução (módulo opcional `caucao`)
+
+O tipo e o valor da garantia ficam no contrato. O módulo cuida da saída:
+
+- Contrato **ativo** com caução: aparece na página do contrato como caução "em posse do locador".
+- Contrato **encerrado** com caução e sem devolução registrada: aviso no painel ("caução de R$ X
+  aguardando devolução, contrato encerrado há N dias") e formulário na página do contrato.
+- **Registrar a devolução** (só pessoas, pela web): data, valor devolvido, descontos e o motivo deles.
+  **Devolvido + descontos tem que fechar com a caução** (pode passar dela, pelo rendimento da
+  poupança); o que não foi devolvido precisa aparecer como desconto, com motivo. Isso pega erro de
+  digitação (300,00 em vez de 3.000,00). Uma devolução por contrato.
+- Base legal (Lei 8.245/1991, art. 38, §2º): a caução em dinheiro não pode passar de **três aluguéis**,
+  deve ficar em **caderneta de poupança**, e o rendimento é do **locatário** quando ela é levantada. O
+  sistema avisa se a caução cadastrada passa de três aluguéis e lembra da poupança, mas **não calcula o
+  rendimento**: quem devolve o inclui no valor. Confirme casos duvidosos com um advogado.
+
 ## 10. Relatórios e consultas
 
 Os mesmos para a web e para o Hermes:
@@ -223,6 +285,12 @@ Os mesmos para a web e para o Hermes:
 - **Ficha do locatário:** dados, todos os contratos (atuais e antigos), total em aberto,
   documentos. Serve para consultar o histórico de um locatário anterior.
 - **Ficha do imóvel:** dados, situação, contrato atual, histórico de contratos, documentos.
+- **Planilha para o imposto de renda** (módulo opcional `exportacao`): baixar em CSV (abre no Excel e
+  no Google Planilhas em português) os pagamentos com os filtros do histórico, e os **recebimentos do
+  ano por locatário e imóvel**, mês a mês e com o total, pela data em que o dinheiro entrou. Nomes que
+  começam com `=`, `+`, `-` ou `@` recebem um apóstrofo na planilha (contra fórmulas maliciosas), e o
+  CPF/CNPJ vai com pontuação (para o Excel não comer o zero da frente). O sistema não sabe o que
+  declarar: confirme com o contador.
 - **Histórico financeiro:** pagamentos válidos filtrados por período, grupo, imóvel ou
   locatário, com total.
 
@@ -243,12 +311,25 @@ Os mesmos para a web e para o Hermes:
 ## 12. Backup
 
 Diário, para o **Google Drive**, com o banco e a pasta de documentos. Roda no servidor,
-**independente do Hermes**. Mantém pelo menos as últimas 14 cópias.
+**independente do Hermes**. Mantém pelo menos as últimas 14 cópias. Faz um backup também ao ligar
+seu servidor, se o último completo tem mais de 20 horas.
+
+O **painel avisa** (módulo opcional `backup`): faixa vermelha se o backup falhou ou está parado há
+mais de 36 horas (ninguém lê o log do servidor), faixa amarela se o Drive não está configurado, e uma
+linha discreta com a data do último backup quando está tudo certo. Backup que nunca foi restaurado
+não vale: o procedimento de restauração está em `docs/instalacao-servidor.md` e foi testado.
+
+## 12b. Mudanças futuras no banco
+
+O sistema guarda a versão do schema. Toda mudança depois de haver dados reais entra como uma
+**migração** numerada (`sistema/db.py`, lista `MIGRACOES`), aplicada uma única vez, com cópia do
+banco antes. Nunca se edita uma migração já publicada.
 
 ## 13. Fora do escopo (não fazer)
 
-Recibo, despesas do imóvel, portal do locatário, contabilidade/imposto, comissão do corretor
-(até o Paulo definir), níveis de permissão, app de celular, migração dos dados da planilha.
+Recibo, despesas do imóvel, portal do locatário, contabilidade/imposto (só a planilha de
+recebimentos), comissão do corretor (até o Paulo definir), níveis de permissão, app de celular,
+migração dos dados da planilha, cálculo do rendimento da poupança da caução.
 
 ## 14. Glossário
 

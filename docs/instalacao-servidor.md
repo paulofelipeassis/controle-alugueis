@@ -59,8 +59,9 @@ nano .env
 ```
 
 No `nano`, preencha `TRAEFIK_REDE`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_CERTRESOLVER` e
-`HERMES_REDE` com o que você descobriu no passo 2. Confira também o `DOMINIO` e o
-`INICIO_COBRANCAS`. Para salvar e sair: Ctrl+O, Enter, Ctrl+X.
+`HERMES_REDE` com o que você descobriu no passo 2. Confira também o `DOMINIO`, o
+`INICIO_COBRANCAS` e `FERIADOS_EXTRAS` (feriados municipais, ex.: `10-24`). `COOKIE_SEGURO=1` já vem
+ligado: o login só funciona entrando por `https://`. Para salvar e sair: Ctrl+O, Enter, Ctrl+X.
 
 `/home/documentos` é a pasta de documentos. Ela aparece no File Browser, que mostra `/home`.
 
@@ -84,6 +85,9 @@ docker compose exec web python -m scripts.criar_usuario
 
 Se você criar o usuário de outra pessoa, use uma senha provisória e peça que ela troque em
 Menu → Trocar senha.
+
+**Alguém esqueceu a senha?** Rode o mesmo comando, digite o login que já existe e responda `s`
+quando ele perguntar se quer trocar a senha.
 
 ## 6. Conectar o Hermes
 
@@ -140,6 +144,20 @@ fica em `/opt/controle-alugueis/dados/backups`.
 **Restaurar** (se um dia precisar): parar o sistema (`docker compose down`), abrir o
 `.tar.gz`, colocar `alugueis.db` em `/opt/controle-alugueis/dados/` e a pasta `documentos` em
 `/home/documentos`, e subir de novo (`docker compose up -d`).
+
+## Restaurar um backup (se o servidor quebrar ou o banco estragar)
+
+1. Instale tudo de novo pelos passos 1 a 4 (um servidor novo serve).
+2. Pare o sistema: `docker compose down`.
+3. Baixe o `.tar.gz` mais recente do Google Drive (pasta "Backup Alugueis") e abra:
+   ```bash
+   mkdir /tmp/restaurar && tar -xzf backup-alugueis-AAAA-MM-DD-HHMM.tar.gz -C /tmp/restaurar
+   rm -f /opt/controle-alugueis/dados/alugueis.db-wal /opt/controle-alugueis/dados/alugueis.db-shm
+   cp /tmp/restaurar/alugueis.db /opt/controle-alugueis/dados/alugueis.db
+   cp -r /tmp/restaurar/documentos/. /home/documentos/
+   ```
+4. Suba de novo: `docker compose up -d`. Os usuários e a senha voltam junto com o banco. O que
+   não está no backup é o `.env` (segredos): gere de novo, e o Hermes precisa do token novo.
 
 ## Atualizar para uma versão nova
 

@@ -6,7 +6,9 @@ Auxiliares e templates ficam em web_comum.py; as páginas dos módulos opcionais
 
 Rodar: uvicorn sistema.web:app --port 8000
 """
+import logging
 import secrets
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -33,17 +35,72 @@ class ExigeLogin(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class CabecalhosDeSeguranca(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        resposta = await call_next(request)
+        resposta.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resposta.headers.setdefault("X-Frame-Options", "DENY")  # ninguém coloca o site dentro de outra página
+        resposta.headers.setdefault("Referrer-Policy", "same-origin")
+        return resposta
+
+
+app.add_middleware(CabecalhosDeSeguranca)
 app.add_middleware(ExigeLogin)
 # Adicionado por último = roda primeiro: a sessão precisa existir antes do ExigeLogin.
 # Sem SESSION_SECRET, usa um aleatório: funciona, mas todos precisam entrar de novo a cada reinício.
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET or secrets.token_hex(32),
-                   max_age=30 * 24 * 3600, same_site="lax")
+                   max_age=30 * 24 * 3600, same_site="lax", https_only=config.COOKIE_SEGURO)
+
+
+class LimiteDeTentativas:
+    """Bloqueia por um tempo quem erra a senha várias vezes seguidas (por login e por endereço).
+    Fica na memória: reiniciar o site zera, e para 3 ou 4 usuários isso basta."""
+
+    def __init__(self, maximo=5, janela=15 * 60):
+        self.maximo, self.janela, self.falhas = maximo, janela, {}
+
+    def _recentes(self, chave):
+        agora = time.time()
+        self.falhas[chave] = [t for t in self.falhas.get(chave, []) if agora - t < self.janela]
+        return self.falhas[chave]
+
+    def bloqueado(self, *chaves):
+        return any(len(self._recentes(c)) >= self.maximo for c in chaves)
+
+    def errou(self, *chaves):
+        for c in chaves:
+            self._recentes(c).append(time.time())
+
+    def acertou(self, *chaves):
+        for c in chaves:
+            self.falhas.pop(c, None)
+
+
+limite_por_login = LimiteDeTentativas(maximo=5)
+limite_por_ip = LimiteDeTentativas(maximo=30)  # mais folgado: a casa toda pode sair pelo mesmo endereço
 
 
 @app.exception_handler(ErroDeNegocio)
 async def _erro_de_negocio(request, erro):
     """Erro em página de consulta (ex.: id que não existe)."""
     return pagina(request, "erro.html", erro=str(erro))
+
+
+@app.exception_handler(ValueError)
+async def _valor_invalido(request, erro):
+    """Número ou data fora do formato (ex.: campo digitado à mão): mensagem em vez de tela de erro."""
+    logging.getLogger("controle_alugueis").warning("Valor inválido em %s: %s", request.url.path, erro)
+    return pagina(request, "erro.html", erro="Algum valor está fora do formato esperado. Volte e confira os campos.")
+
+
+@app.exception_handler(Exception)
+async def _erro_inesperado(request, erro):
+    logging.getLogger("controle_alugueis").error("Erro inesperado em %s", request.url.path, exc_info=erro)
+    # Sem depender da sessão: este tratador roda fora dos middlewares.
+    return templates.TemplateResponse(request, "erro.html", {
+        "usuario": None, "mensagens": [], "status_code": 500,
+        "erro": "Algo deu errado no sistema. Tente de novo; se repetir, avise quem cuida do sistema."},
+        status_code=500)
 
 
 @app.get("/saude")
@@ -59,9 +116,17 @@ def login(request: Request):
 @app.post("/login")
 async def login_post(request: Request):
     form = await ler_form(request)
+    login_digitado = str(form.get("login") or "").lower()
+    ip = request.client.host if request.client else "?"
+    if limite_por_login.bloqueado(login_digitado) or limite_por_ip.bloqueado(ip):
+        return pagina(request, "login.html", login=form.get("login"),
+                      erro="Muitas tentativas erradas. Espere 15 minutos e tente de novo.")
     usuario = servicos.autenticar(form.get("login"), form.get("senha"))
     if not usuario:
+        limite_por_login.errou(login_digitado)
+        limite_por_ip.errou(ip)
         return pagina(request, "login.html", erro="Login ou senha incorretos.", login=form.get("login"))
+    limite_por_login.acertou(login_digitado)
     request.session.clear()
     request.session["usuario"] = usuario
     return ir("/")
@@ -254,7 +319,7 @@ def corretor_apagar(request: Request, corretor_id: int):
 
 # --- CONTRATOS ---
 def _opcoes_contrato():
-    return {"imoveis": [i for i in consultas.listar_imoveis() if i["situacao"] != "alugado"],
+    return {"imoveis": [i for i in consultas.listar_imoveis() if i["situacao"] not in ("alugado", "reservado")],
             "locatarios": consultas.listar_locatarios(), "corretores": consultas.listar_corretores()}
 
 
@@ -316,8 +381,17 @@ async def contrato_editar_post(request: Request, contrato_id: int):
                 **_opcoes_contrato()}
     return salvar_form(request, "contrato_form.html", contexto,
                         lambda: servicos.atualizar_contrato(quem(request), contrato_id,
+                                                            data_fim_prevista=form.get("data_fim_prevista"),
                                                             **_dados_contrato_editaveis(form)),
                         lambda _: f"/contratos/{contrato_id}", "Contrato atualizado.")
+
+
+@app.post("/contratos/{contrato_id}/reabrir")
+async def contrato_reabrir(request: Request, contrato_id: int):
+    form = await ler_form(request)
+    return acao(request, f"/contratos/{contrato_id}",
+                lambda: servicos.reabrir_contrato(quem(request), contrato_id, form.get("motivo")),
+                "Contrato reaberto. As cobranças canceladas pelo encerramento voltaram a valer.")
 
 
 @app.post("/contratos/{contrato_id}/reajuste")
@@ -339,8 +413,22 @@ async def contrato_renovar(request: Request, contrato_id: int):
 @app.post("/contratos/{contrato_id}/encerrar")
 async def contrato_encerrar(request: Request, contrato_id: int):
     form = await ler_form(request)
-    return acao(request, f"/contratos/{contrato_id}", lambda: servicos.encerrar_contrato(
-        quem(request), contrato_id, form.get("data_encerramento"), form.get("motivo")), "Contrato encerrado.")
+
+    def encerrar():
+        escolha = form.get("cobrar_ate_a_saida")
+        if escolha not in ("sim", "nao"):
+            raise ErroDeNegocio("Escolha como o contrato cobra o aluguel: depois do uso, ou no próprio mês/adiantado.")
+        return servicos.encerrar_contrato(quem(request), contrato_id, form.get("data_encerramento"),
+                                          form.get("motivo"), cobrar_ate_a_saida=escolha == "sim")
+
+    def mensagem(resultado):
+        ultima = resultado["ultima_cobranca"]
+        if not ultima:
+            return "Contrato encerrado."
+        return (f"Contrato encerrado. Última cobrança: {ultima['competencia'][5:]}/{ultima['competencia'][:4]}, "
+                f"{ultima['valor']} ({ultima['dias']} de {ultima['dias_do_mes']} dias até a saída).")
+
+    return acao(request, f"/contratos/{contrato_id}", encerrar, mensagem)
 
 
 @app.post("/contratos/{contrato_id}/apagar")
@@ -464,7 +552,7 @@ def pagamentos(request: Request, data_de: str = "", data_ate: str = "", grupo: s
     except ErroDeNegocio as erro:
         avisar(request, str(erro), "erro")
         historico = consultas.historico_pagamentos()
-    return pagina(request, "pagamentos.html", h=historico, grupos=consultas.grupos(),
+    return pagina(request, "pagamentos.html", h=historico, grupos=consultas.grupos(), hoje_ano=regras.hoje().year,
                    locatarios=consultas.listar_locatarios(),
                    filtros=dict(data_de=data_de, data_ate=data_ate, grupo=grupo, locatario_id=locatario_id,
                                 cancelados=cancelados))
@@ -499,13 +587,19 @@ def auditoria(request: Request, entidade: str = ""):
 
 
 # --- ARQUIVOS DA PASTA DE DOCUMENTOS ---
+EXTENSOES_QUE_ABREM = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".txt"}
+
 @app.get("/arquivo/{caminho:path}")
 def arquivo(caminho: str):
     """Abre um arquivo da pasta de documentos (comprovantes e documentos dos módulos)."""
     absoluto = arquivos.caminho_absoluto(caminho)
     if not absoluto.is_file():
         raise ErroDeNegocio(f"O arquivo não está na pasta de documentos: {caminho}")
-    return FileResponse(absoluto, filename=absoluto.name, content_disposition_type="inline")
+    # Só PDF, imagem e texto abrem no navegador. O resto (ex.: .html, .svg, que poderiam rodar script
+    # dentro do site) é baixado. nosniff impede o navegador de "adivinhar" outro tipo.
+    seguro = absoluto.suffix.lower() in EXTENSOES_QUE_ABREM
+    return FileResponse(absoluto, filename=absoluto.name, headers={"X-Content-Type-Options": "nosniff"},
+                        content_disposition_type="inline" if seguro else "attachment")
 
 
 # --- MÓDULOS OPCIONAIS (sistema/modulos/*/web.py) ---

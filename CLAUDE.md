@@ -41,11 +41,15 @@ core reads/reports; `regras.py` holds pure date/money/status rules; `arquivos.py
 shared documents folder and its path convention; `web.py` (+ helpers/templates in
 `web_comum.py`) and `mcp_server.py` only translate parameters and call those.
 
-Optional features live in `sistema/modulos/<nome>/` (today: `documentos`, `reajuste`) and are
-discovered automatically by `sistema/modulos/__init__.py`: optional `schema.sql`, `web.py`
-(`router`), `mcp.py` (`registrar(mcp)`), `templates/<nome>/`, and their own `test_*.py`.
+Optional features live in `sistema/modulos/<nome>/` (today: `documentos`, `reajuste`, `backup`,
+`caucao`, `proporcional`, `exportacao`) and are discovered automatically by
+`sistema/modulos/__init__.py`: optional `schema.sql`, `web.py` (`router`), `mcp.py`
+(`registrar(mcp)`), `alertas.py` (`alertas(hoje)`, merged into `consultas.alertas`; a failing module
+becomes an `erro_de_modulo` alert instead of breaking the dashboard), `templates/<nome>/`, and their
+own `test_*.py`.
 Deleting a module folder removes the feature and the rest keeps working (verified by running
-the suite with each module deleted). Core code never imports a module by name; core templates
+the suite with each module deleted, and with all of them deleted). Core tests must never import a
+module. Core code never imports a module by name; core templates
 use `{% if modulo_ativo("nome") %}`; module tables use `ON DELETE CASCADE` so core deletes
 don't need to know about them. Money is integer centavos, dates ISO text, statuses are
 computed, never stored. `config.py` values are read as `config.X` at call time so tests can
@@ -55,6 +59,10 @@ Keep the core small and optional features removable (Paulo's rule: "modularize s
 possível", "não criar um Frankenstein"). The core is cadastros → contratos → cobranças
 (with boletos) → pagamentos (+ pendências, auditoria, usuários). Any new feature that the
 core doesn't strictly need goes in a new `sistema/modulos/<nome>/` folder.
+Schema changes once real data exists go in `db.MIGRACOES` (numbered, applied once, DB copied first;
+see the comment there) and also in `schema.sql`. A due date on a weekend/holiday is payable
+without late fees until the next business day (`regras.vencimento_efetivo`): use it, never the raw
+due date, whenever judging lateness or computing fees.
 Don't add tables or scheduled jobs for things that can be computed on demand, and don't
 build features "just in case" — the schema is what's hard to change once real data exists.
 

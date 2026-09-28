@@ -1,0 +1,29 @@
+{# Bloco "Caução" da página do contrato. Espera: c (o contrato). #}
+{% set k = caucao_de(c.id) %}
+{% if k %}
+<h3>Caução</h3>
+{% if k.excede_limite %}
+<div class="msg aviso">A caução em dinheiro não pode passar de 3 aluguéis ({{ k.limite }}), segundo a Lei do Inquilinato (art. 38, §2º). Confira o valor cadastrado.</div>
+{% endif %}
+{% if k.estado == "retida" %}
+<p>Caução de <strong>{{ k.valor }}</strong> em posse do locador. Em dinheiro, ela deve ficar em caderneta de poupança, e o rendimento é do locatário quando ela for devolvida (art. 38, §2º).</p>
+{% elif k.estado == "a_devolver" %}
+<div class="msg aviso">Contrato encerrado em {{ k.encerramento|data }} (há {{ k.dias_desde_encerramento }} dias). Caução de <strong>{{ k.valor }}</strong> aguardando devolução.</div>
+<details class="acao"><summary>Registrar devolução da caução</summary>
+  <form method="post" action="/contratos/{{ c.id }}/caucao">
+    <label>Data da devolução * <input type="date" name="data_devolucao" required></label>
+    <label>Valor devolvido * <input type="text" name="valor_devolvido" inputmode="decimal" placeholder="0,00" required>
+      <small>Inclua o rendimento da poupança, que é do locatário.</small></label>
+    <label>Descontos <input type="text" name="descontos" inputmode="decimal" placeholder="0,00">
+      <small>O que não foi devolvido (danos, pintura, aluguel em aberto). Devolvido + descontos precisa fechar com {{ k.valor }}.</small></label>
+    <label>Motivo dos descontos <input type="text" name="motivo_descontos"></label>
+    <label>Observação <input type="text" name="observacao"></label>
+    <button type="submit">Registrar devolução</button>
+  </form>
+</details>
+{% else %}
+<p>Caução de <strong>{{ k.valor }}</strong> devolvida em {{ k.devolucao.devolvida_em|data }}: <strong>{{ k.devolucao.valor_devolvido }}</strong>
+  {% if k.devolucao.descontos_centavos %}, com descontos de {{ k.devolucao.descontos }} ({{ k.devolucao.motivo_descontos }}){% endif %}.
+  <br><small>Registrado por {{ k.devolucao.registrado_por }} em {{ k.devolucao.registrado_em|data }}{% if k.devolucao.observacao %} · {{ k.devolucao.observacao }}{% endif %}</small></p>
+{% endif %}
+{% endif %}
