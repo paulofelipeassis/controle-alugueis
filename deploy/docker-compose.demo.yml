@@ -14,5 +14,6 @@ services:
       INICIO_COBRANCAS: "2026-10"   # como a simulação foi gerada
       FERIADOS_EXTRAS: "08-01,11-30,12-08"
       COOKIE_SEGURO: "0"            # http, sem HTTPS
+      DEMO_SEM_LOGIN: "1"           # qualquer pessoa com o link entra, sem senha
     volumes:
       - /opt/controle-alugueis/demo-dados:/dados

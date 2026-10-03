@@ -30,6 +30,8 @@ app.mount("/static", StaticFiles(directory=PASTA / "static"), name="static")
 class ExigeLogin(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         livre = request.url.path in ("/login", "/saude") or request.url.path.startswith("/static/")
+        if config.DEMO_SEM_LOGIN and "usuario" not in request.session:  # só na demonstração
+            request.session["usuario"] = {"login": "visitante", "nome": "Visitante"}
         if not livre and "usuario" not in request.session:
             return RedirectResponse("/login", status_code=303)
         return await call_next(request)

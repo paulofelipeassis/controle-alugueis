@@ -24,3 +24,5 @@ FERIADOS_EXTRAS = os.environ.get("FERIADOS_EXTRAS", "")
 COOKIE_SEGURO = os.environ.get("COOKIE_SEGURO", "0") == "1"
 # SÓ PARA DEMONSTRAÇÃO (branch descartável): "AAAA-MM-DD" congela a data de hoje do sistema.
 HOJE_FICTICIO = os.environ.get("HOJE_FICTICIO", "")
+# SÓ PARA DEMONSTRAÇÃO: "1" entra direto como "visitante", sem login.
+DEMO_SEM_LOGIN = os.environ.get("DEMO_SEM_LOGIN", "0") == "1"
