@@ -16,10 +16,10 @@ x-base: &base
 services:
   web:
     <<: *base
-    networks: [traefik]
+    networks: [web]
     labels:
       - traefik.enable=true
-      - traefik.docker.network=${TRAEFIK_REDE}
+      - traefik.docker.network=alugueis-web
       - traefik.http.routers.alugueis.rule=Host(`${DOMINIO}`)
       - traefik.http.routers.alugueis.entrypoints=${TRAEFIK_ENTRYPOINT}
       - traefik.http.routers.alugueis.tls.certresolver=${TRAEFIK_CERTRESOLVER}
@@ -40,9 +40,10 @@ services:
     network_mode: bridge
 
 networks:
-  traefik:
-    external: true
-    name: ${TRAEFIK_REDE}
+  # Rede própria do site. O Traefik da Hostinger roda em modo "host" e alcança o container
+  # pelo IP dela; por isso não existe rede do Traefik para entrar.
+  web:
+    name: alugueis-web
   hermes:
     external: true
     name: ${HERMES_REDE}

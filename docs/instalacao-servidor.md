@@ -34,11 +34,11 @@ Não adivinhe esses valores: eles dependem de como a Hostinger instalou cada coi
 docker ps --format 'table {{.Names}}\t{{.Image}}'
 ```
 
-Anote o nome do container do **Traefik** e o do **Hermes**. Depois (troque os nomes):
+Anote o nome do container do **Traefik** e o do **Hermes**. O Traefik da Hostinger roda em modo
+`host` e acha o site pelo IP da rede `alugueis-web`, que o próprio compose cria: não há rede do
+Traefik para informar. Depois (troque os nomes):
 
 ```bash
-# Rede do Traefik
-docker inspect NOME_DO_TRAEFIK --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
 # Nome do certresolver e do entrypoint HTTPS (procure por certificatesresolvers.XXX e entrypoints.YYY.address=:443)
 docker inspect NOME_DO_TRAEFIK --format '{{join .Config.Cmd "\n"}}' | grep -E 'certificatesresolvers|entrypoints'
 # Rede do Hermes
@@ -58,7 +58,7 @@ sed -i "s/^MCP_TOKEN=.*/MCP_TOKEN=$(openssl rand -hex 32)/" .env
 nano .env
 ```
 
-No `nano`, preencha `TRAEFIK_REDE`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_CERTRESOLVER` e
+No `nano`, preencha `TRAEFIK_ENTRYPOINT`, `TRAEFIK_CERTRESOLVER` e
 `HERMES_REDE` com o que você descobriu no passo 2. Confira também o `DOMINIO`, o
 `INICIO_COBRANCAS` (já vem `2026-11`) e `FERIADOS_EXTRAS` (já vem com os de Formosa). `COOKIE_SEGURO=1` já vem
 ligado: o login só funciona entrando por `https://`. Para salvar e sair: Ctrl+O, Enter, Ctrl+X.
