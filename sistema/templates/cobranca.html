@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo, dinheiro %}
+{% block titulo %}Cobrança {{ c.competencia|comp }} · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
-<h2>Cobrança {{ c.competencia|comp }} {{ selo(c.situacao_calculada) }}</h2>
-<p><a href="/contratos/{{ contrato.id }}">{{ contrato.imovel_nome }} — {{ contrato.locatario_nome }}</a></p>
+<a class="voltar" href="/contratos/{{ contrato.id }}">← Contrato de {{ contrato.imovel_nome }}</a>
+<div class="cabeca-pagina">
+  <h2>Cobrança {{ c.competencia|comp }} {{ selo(c.situacao_calculada) }}</h2>
+  {% if c.situacao == "normal" and c.saldo_centavos > 0 %}<a role="button" href="/pagamentos/novo?cobranca_id={{ c.id }}">Lançar pagamento</a>{% endif %}
+</div>
+<p class="subtitulo"><a href="/contratos/{{ contrato.id }}">{{ contrato.imovel_nome }}</a> · {{ contrato.locatario_nome }}</p>
+<div class="numeros">
+  <article><small>Valor</small><strong>{{ c.valor }}</strong></article>
+  <article class="bom"><small>Pago</small><strong>{{ c.pago }}</strong></article>
+  <article class="{% if c.situacao_calculada == 'atrasada' %}ruim{% endif %}"><small>Saldo</small><strong>{{ c.saldo }}</strong>{% if c.situacao_calculada == "atrasada" %}<small>com multa e juros: {{ c.valor_atualizado }}</small>{% endif %}</article>
+</div>
 <ul>
   <li>Vencimento: {{ c.vencimento|data }}{% if c.vencimento_efetivo != c.vencimento %} <small>(dia sem expediente bancário: pode ser pago sem multa e juros até {{ c.vencimento_efetivo|data }})</small>{% endif %}</li>
-  <li>Valor: <strong>{{ c.valor }}</strong> · pago: {{ c.pago }} · saldo: <strong>{{ c.saldo }}</strong></li>
-  {% if c.situacao_calculada == "atrasada" %}<li>{{ c.dias_atraso }} dias de atraso · com multa e juros: <strong>{{ c.valor_atualizado }}</strong></li>{% endif %}
+  {% if c.situacao_calculada == "atrasada" %}<li><strong>{{ c.dias_atraso }} dias de atraso</strong></li>{% endif %}
   {% if c.motivo_situacao %}<li>Motivo: {{ c.motivo_situacao }}</li>{% endif %}
   {% if c.boleto_identificador %}
   <li>Boleto {{ c.boleto_banco }} nº {{ c.boleto_identificador }}, emitido em {{ c.boleto_emitido_em|data }}
@@ -18,9 +27,6 @@
 
 {% if c.reajuste_pendente %}
 <div class="msg aviso">Esta cobrança vence depois do aniversário do contrato e o reajuste do ano ainda não foi registrado. <a href="{% if modulo_ativo("reajuste") %}/contratos/{{ contrato.id }}/reajuste{% else %}/contratos/{{ contrato.id }}{% endif %}">Registrar reajuste →</a></div>
-{% endif %}
-{% if c.situacao == "normal" and c.saldo_centavos > 0 %}
-<div class="acoes"><a role="button" href="/pagamentos/novo?cobranca_id={{ c.id }}">Lançar pagamento</a></div>
 {% endif %}
 
 <h3>Pagamentos</h3>
@@ -41,7 +47,7 @@
   </details>
   {% endif %}
 </article>
-{% else %}<p>Nenhum pagamento.</p>{% endfor %}
+{% else %}<p class="vazio">Nenhum pagamento registrado.</p>{% endfor %}
 
 {% if c.situacao == "normal" %}
 <h3>Ações</h3>
@@ -56,7 +62,7 @@
   </form>
 </details>
 {% if c.boleto_identificador and not c.boleto_enviado_em %}
-<form method="post" action="/cobrancas/{{ c.id }}/enviado"><button type="submit" class="outline">Marcar boleto como enviado</button></form>
+<form method="post" action="/cobrancas/{{ c.id }}/enviado" style="margin-bottom: 0.5rem"><button type="submit" class="outline">Marcar boleto como enviado</button></form>
 {% endif %}
 {% if not c.pago_centavos %}
 <details class="acao"><summary>Mudar valor</summary>

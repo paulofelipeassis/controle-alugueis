@@ -1,26 +1,30 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo %}
+{% block titulo %}Cobranças · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Cobranças</h2>
-<form method="get" class="grid">
-  <label>Mês <input type="month" name="competencia" value="{{ competencia }}"></label>
+<form method="get" class="filtro">
+  <label>Mês <input type="month" name="competencia" value="{{ competencia }}" onchange="this.form.submit()"></label>
   <label>Situação
-    <select name="situacao"><option value="">Todas</option>
+    <select name="situacao" onchange="this.form.submit()"><option value="">Todas</option>
       {% for v, r in SITUACOES_COBRANCA %}<option value="{{ v }}" {% if situacao == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
   </label>
-  <label>&nbsp;<button type="submit">Filtrar</button></label>
+  <button type="submit" class="secondary">Filtrar</button>
 </form>
-<p>{{ cobrancas|length }} cobrança(s) · saldo em aberto: <strong>{{ total|reais }}</strong></p>
-<div class="overflow-auto"><table>
-  <thead><tr><th>Mês</th><th>Situação</th><th>Imóvel</th><th class="num">Saldo</th><th>Locatário</th><th>Vencimento</th><th class="num">Valor</th><th>Boleto</th></tr></thead>
+<p class="resumo-linha"><strong>{{ cobrancas|length }}</strong> cobrança(s) · saldo em aberto: <strong>{{ total|reais }}</strong>
+  {% if competencia or situacao %}· <a href="/cobrancas">limpar filtros</a>{% endif %}</p>
+<div class="overflow-auto"><table class="cartoes">
+  <thead><tr><th>Imóvel</th><th>Locatário</th><th>Mês</th><th>Situação</th><th>Vencimento</th><th class="num">Valor</th><th class="num">Saldo</th><th>Boleto</th></tr></thead>
   <tbody>
   {% for c in cobrancas|reverse %}
-  <tr><td><a href="/cobrancas/{{ c.id }}">{{ c.competencia|comp }}</a></td><td>{{ selo(c.situacao_calculada) }}</td>
-      <td>{{ c.imovel_nome }}</td><td class="num">{{ c.saldo }}</td><td>{{ c.locatario_nome }}</td>
-      <td>{{ c.vencimento|data }}</td><td class="num">{{ c.valor }}</td>
-      <td>{% if c.boleto_identificador %}{% if c.boleto_enviado_em %}enviado{% else %}não enviado{% endif %}{% else %}—{% endif %}</td></tr>
-  {% else %}<tr><td colspan="8">Nenhuma cobrança.</td></tr>{% endfor %}
+  <tr><td class="titulo"><a href="/cobrancas/{{ c.id }}">{{ c.imovel_nome }}</a></td>
+      <td data-label="Locatário">{{ c.locatario_nome }}</td>
+      <td data-label="Mês">{{ c.competencia|comp }}</td><td data-label="Situação">{{ selo(c.situacao_calculada) }}</td>
+      <td data-label="Vencimento">{{ c.vencimento|data }}</td><td class="num" data-label="Valor">{{ c.valor }}</td>
+      <td class="num" data-label="Saldo">{{ c.saldo }}</td>
+      <td data-label="Boleto">{% if c.boleto_identificador %}{% if c.boleto_enviado_em %}enviado{% else %}<strong>não enviado</strong>{% endif %}{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8">Nenhuma cobrança com esses filtros.</td></tr>{% endfor %}
   </tbody>
 </table></div>
 {% endblock %}

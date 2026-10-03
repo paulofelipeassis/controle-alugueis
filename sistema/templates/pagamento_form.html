@@ -1,30 +1,67 @@
 {% extends "base.html" %}
 {% from "_macros.html" import campo, texto, dinheiro %}
+{% block titulo %}Lançar pagamento · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Lançar pagamento</h2>
-{% if not cobrancas %}<p>Nenhuma cobrança em aberto.</p>{% else %}
-<form method="post" enctype="multipart/form-data">
-  <label>Cobrança (imóvel — locatário — mês) *
-    <select name="cobranca_id" required>
-      <option value="">Escolha…</option>
-      {% for c in cobrancas %}
-      <option value="{{ c.id }}" {% if dados.get('cobranca_id')|string == c.id|string %}selected{% endif %}>
-        {{ c.imovel_nome }} — {{ c.locatario_nome }} — {{ c.competencia|comp }} (vence {{ c.vencimento|data }}, saldo {{ c.saldo }}{% if c.situacao_calculada == 'atrasada' %}, com multa e juros {{ c.valor_atualizado }}{% endif %})
-      </option>
-      {% endfor %}
-    </select>
-  </label>
-  <div class="grid">
-    {{ campo("data_pagamento", "Data do pagamento", dados, tipo="date", obrigatorio=True) }}
-    {{ dinheiro("valor", "Valor pago", dados, obrigatorio=True) }}
-  </div>
-  <label>Forma
-    <select name="forma">{% for v, r in FORMAS %}<option value="{{ v }}" {% if dados.get('forma') == v %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
-  </label>
-  {{ campo("identificador_externo", "Código da transação ou nosso número (opcional)", dados, ajuda="Evita lançar o mesmo pagamento duas vezes.") }}
-  <label>Comprovante (opcional) <input type="file" name="comprovante"></label>
-  {{ texto("observacao", "Observação", dados) }}
+{% if not cobrancas %}<p class="vazio">Nenhuma cobrança em aberto.</p>{% else %}
+<p class="nota-obrigatorio">Campos com * são obrigatórios.</p>
+<form method="post" enctype="multipart/form-data" class="formulario">
+  <fieldset class="grupo">
+    <legend>Qual cobrança foi paga?</legend>
+    <label>Buscar por imóvel ou locatário
+      <input type="search" id="busca-cobranca" placeholder="Ex.: Sala 2 ou Maria" autocomplete="off">
+    </label>
+    <label>Cobrança * <small>(imóvel · locatário · mês)</small>
+      <select name="cobranca_id" id="cobranca" required>
+        <option value="">Escolha…</option>
+        {% for c in cobrancas %}
+        <option value="{{ c.id }}" data-saldo="{{ c.saldo }}" data-vencimento="{{ c.vencimento|data }}"
+                data-atrasada="{{ 1 if c.situacao_calculada == 'atrasada' else 0 }}" data-atualizado="{{ c.valor_atualizado }}"
+                {% if dados.get('cobranca_id')|string == c.id|string %}selected{% endif %}>
+          {{ c.imovel_nome }} · {{ c.locatario_nome }} · {{ c.competencia|comp }}{% if c.situacao_calculada == 'atrasada' %} (atrasada){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="dica-saldo" id="dica-saldo" role="status" hidden></p>
+  </fieldset>
+  <fieldset class="grupo">
+    <legend>Dados do pagamento</legend>
+    <div class="grid">
+      {{ campo("data_pagamento", "Data do pagamento", dados, tipo="date", obrigatorio=True) }}
+      {{ dinheiro("valor", "Valor pago", dados, obrigatorio=True) }}
+    </div>
+    <label>Forma de pagamento
+      <select name="forma">{% for v, r in FORMAS %}<option value="{{ v }}" {% if dados.get('forma') == v %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+    </label>
+  </fieldset>
+  <details class="acao"><summary>Mais opções (comprovante, código da transação, observação)</summary>
+    {{ campo("identificador_externo", "Código da transação ou nosso número", dados, ajuda="Evita lançar o mesmo pagamento duas vezes.") }}
+    <label>Comprovante <input type="file" name="comprovante"></label>
+    {{ texto("observacao", "Observação", dados) }}
+  </details>
   <button type="submit">Registrar pagamento</button>
 </form>
+<script>
+  (function () {
+    var sel = document.getElementById("cobranca"), dica = document.getElementById("dica-saldo"), busca = document.getElementById("busca-cobranca");
+    var todas = Array.prototype.slice.call(sel.options).slice(1);
+    function mostrarDica() {
+      var o = sel.options[sel.selectedIndex];
+      if (!o || !o.value) { dica.hidden = true; return; }
+      dica.textContent = "Vence em " + o.dataset.vencimento + " · saldo " + o.dataset.saldo +
+        (o.dataset.atrasada === "1" ? " · com multa e juros: " + o.dataset.atualizado : "");
+      dica.hidden = false;
+    }
+    busca.addEventListener("input", function () {
+      var q = busca.value.trim().toLowerCase(), atual = sel.value;
+      while (sel.options.length > 1) sel.remove(1);
+      todas.forEach(function (o) { if (o.value === atual || o.text.toLowerCase().indexOf(q) !== -1) sel.add(o); });
+      sel.value = atual;
+    });
+    sel.addEventListener("change", mostrarDica);
+    mostrarDica();
+  })();
+</script>
 {% endif %}
 {% endblock %}

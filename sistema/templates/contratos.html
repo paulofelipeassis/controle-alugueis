@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo %}
+{% block titulo %}Contratos · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
-<h2>Contratos</h2>
-<div class="acoes">
-  <a role="button" href="/contratos/novo">Novo contrato</a>
-  <a role="button" class="outline" href="/contratos?status=ativos">Ativos</a>
-  <a role="button" class="outline" href="/contratos?status=encerrados">Encerrados</a>
-  <a role="button" class="outline" href="/contratos?status=todos">Todos</a>
-</div>
-<div class="overflow-auto"><table>
+<div class="cabeca-pagina"><h2>Contratos</h2><a role="button" href="/contratos/novo">Novo contrato</a></div>
+<nav class="filtros" aria-label="Filtrar contratos">
+  <a href="/contratos?status=ativos"{% if status == "ativos" %} aria-current="true"{% endif %}>Ativos</a>
+  <a href="/contratos?status=encerrados"{% if status == "encerrados" %} aria-current="true"{% endif %}>Encerrados</a>
+  <a href="/contratos?status=todos"{% if status == "todos" %} aria-current="true"{% endif %}>Todos</a>
+</nav>
+<div class="overflow-auto"><table class="cartoes">
   <thead><tr><th>Imóvel</th><th>Locatário</th><th class="num">Aluguel</th><th>Vence dia</th><th>Fim</th><th>Situação</th></tr></thead>
   <tbody>
   {% for c in contratos %}
-  <tr><td><a href="/contratos/{{ c.id }}">{{ c.imovel_nome }}</a></td><td>{{ c.locatario_nome }}</td>
-      <td class="num">{{ c.valor_atual }}</td><td>{{ c.dia_vencimento }}</td>
-      <td>{{ (c.data_encerramento or c.data_fim_prevista)|data }}{% if c.prazo_vencido %} ⚠️{% endif %}</td>
-      <td>{{ selo(c.status) }}</td></tr>
+  <tr><td class="titulo"><a href="/contratos/{{ c.id }}">{{ c.imovel_nome }}</a></td><td data-label="Locatário">{{ c.locatario_nome }}</td>
+      <td class="num" data-label="Aluguel">{{ c.valor_atual }}</td><td data-label="Vence dia">{{ c.dia_vencimento }}</td>
+      <td data-label="Fim"><span>{{ (c.data_encerramento or c.data_fim_prevista)|data }}{% if c.prazo_vencido %} <span class="aviso-prazo">⚠ prazo vencido</span>{% endif %}</span></td>
+      <td data-label="Situação">{{ selo(c.status) }}</td></tr>
   {% else %}<tr><td colspan="6">Nenhum contrato.</td></tr>{% endfor %}
   </tbody>
 </table></div>
