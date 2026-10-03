@@ -17,7 +17,7 @@
 {% endif %}
 
 <div class="resumo-mes">
-  <article>
+  <article class="hero">
     <h3>Aluguéis de {{ r.competencia|comp_extenso }}</h3>
     <span class="grande">{{ r.recebido }} <small class="legenda">recebidos de {{ r.devido }}</small></span>
     <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_recebido }}" aria-label="Recebido no mês">
@@ -68,21 +68,27 @@
 <script src="/static/plotly-basic.min.js"></script>
 <script>
   const recebido = {{ recebido|tojson }};
+  const imoveis = [["Alugados", {{ p.imoveis_alugados }}, "--ok-forte"], ["Reservados", {{ p.imoveis_reservados }}, "--reservado"],
+                   ["Vagos", {{ p.imoveis_vagos }}, "--info"], ["Em manutenção", {{ p.imoveis_em_manutencao }}, "--aviso"]].filter(i => i[1] > 0);
   const config = {displayModeBar: false, responsive: true};
-  const fonte = {family: "system-ui, sans-serif", color: "#33414e"};
-  Plotly.newPlot("grafico-recebido", [{
-    type: "bar", x: recebido.map(r => r.mes.slice(5) + "/" + r.mes.slice(2, 4)),
-    y: recebido.map(r => r.recebido_centavos / 100), customdata: recebido.map(r => r.recebido),
-    hovertemplate: "%{x}: %{customdata}<extra></extra>", marker: {color: "#0b5cad"}
-  }], {title: {text: "Recebido por mês", font: {size: 15}}, font: fonte, margin: {t: 40, l: 60, r: 10, b: 40},
-       yaxis: {tickprefix: "R$ ", tickformat: ",.0f", gridcolor: "#e3e8ee"}, xaxis: {type: "category", tickangle: -45},
-       paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)"}, config);
-  const imoveis = [["Alugados", {{ p.imoveis_alugados }}, "#2e7d32"], ["Reservados", {{ p.imoveis_reservados }}, "#6a4fc4"],
-                   ["Vagos", {{ p.imoveis_vagos }}, "#1e6fc0"], ["Em manutenção", {{ p.imoveis_em_manutencao }}, "#d98a00"]].filter(i => i[1] > 0);
-  Plotly.newPlot("grafico-imoveis", [{
-    type: "pie", hole: 0.55, labels: imoveis.map(i => i[0]), values: imoveis.map(i => i[1]), marker: {colors: imoveis.map(i => i[2])},
-    textinfo: "value", sort: false
-  }], {title: {text: "Imóveis", font: {size: 15}}, font: fonte, margin: {t: 40, l: 10, r: 10, b: 10}, legend: {orientation: "h", y: -0.05},
-       paper_bgcolor: "rgba(0,0,0,0)"}, config);
+  function cor(nome) { return getComputedStyle(document.documentElement).getPropertyValue(nome).trim(); }
+  function desenhar() {  // lê as cores do tema atual (claro ou escuro)
+    const fonte = {family: "Inter Variable, system-ui, sans-serif", color: cor("--texto")};
+    const fundo = "rgba(0,0,0,0)";
+    Plotly.react("grafico-recebido", [{
+      type: "bar", x: recebido.map(r => r.mes.slice(5) + "/" + r.mes.slice(2, 4)),
+      y: recebido.map(r => r.recebido_centavos / 100), customdata: recebido.map(r => r.recebido),
+      hovertemplate: "%{x}: %{customdata}<extra></extra>", marker: {color: cor("--grafico")}
+    }], {title: {text: "Recebido por mês", font: {size: 15}}, font: fonte, margin: {t: 40, l: 60, r: 10, b: 40},
+         yaxis: {tickprefix: "R$ ", tickformat: ",.0f", gridcolor: cor("--borda")}, xaxis: {type: "category", tickangle: -45},
+         paper_bgcolor: fundo, plot_bgcolor: fundo}, config);
+    Plotly.react("grafico-imoveis", [{
+      type: "pie", hole: 0.6, labels: imoveis.map(i => i[0]), values: imoveis.map(i => i[1]),
+      marker: {colors: imoveis.map(i => cor(i[2])), line: {color: cor("--superficie"), width: 2}}, textinfo: "value", textfont: {color: cor("--superficie"), size: 13}, sort: false
+    }], {title: {text: "Imóveis", font: {size: 15}}, font: fonte, margin: {t: 40, l: 10, r: 10, b: 10},
+         legend: {orientation: "h", y: -0.05}, paper_bgcolor: fundo}, config);
+  }
+  desenhar();
+  document.addEventListener("temamudou", desenhar);
 </script>
 {% endblock %}

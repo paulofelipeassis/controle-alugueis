@@ -18,6 +18,19 @@ Método: o sistema foi aberto com os dados fictícios (20 imóveis, 15 meses), e
 | 8 | Todas as páginas com o mesmo título de aba | WCAG 2.4.2 (página com título) | Título por página ("Contratos · Controle de Aluguéis") |
 | 9 | Alvos de toque pequenos, sem foco visível | WCAG 2.5.8 (mínimo 24 px) e 2.4.7 (foco visível); Apple HIG recomenda 44 pt | Botões e itens de menu com 44 px ou mais, anel de foco visível, link "ir para o conteúdo" |
 
+## Segunda rodada: visual moderno e modo escuro
+
+A primeira rodada arrumou navegação e legibilidade, mas manteve o visual padrão do Pico CSS (botões, cores e
+tipografia com cara de 2010). Esta rodada troca a camada visual, sem mudar nenhuma página nem regra:
+
+- Tipografia Inter (hospedada no próprio site, sem depender de serviço externo; licença OFL em `static/inter-LICENSE.txt`).
+- Paleta índigo com tokens de cor no começo de `estilo.css`: cartões com raio e sombra suaves, botões com peso e estados
+  (principal, secundário, contorno, perigo), seletores segmentados nos filtros, tabelas como cartões com cabeçalho discreto.
+- Cartão do mês em destaque no painel, barra de navegação flutuante no celular com a ação "Lançar" em evidência.
+- Modo escuro: segue o aparelho (`prefers-color-scheme`) e tem botão sol/lua no topo; a escolha fica salva no navegador.
+  Os gráficos leem as cores do tema e se redesenham ao alternar. Todos os pares de cor de texto foram conferidos
+  com razão de contraste ≥ 4,5:1 nos dois temas (WCAG 1.4.3).
+
 ## Fica para decidir (muda comportamento, não só aparência)
 
 - A lista de Cobranças abre com todos os meses (264 no exemplo). Abrir no mês atual seria mais útil.
