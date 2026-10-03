@@ -60,7 +60,7 @@ nano .env
 
 No `nano`, preencha `TRAEFIK_REDE`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_CERTRESOLVER` e
 `HERMES_REDE` com o que você descobriu no passo 2. Confira também o `DOMINIO`, o
-`INICIO_COBRANCAS` e `FERIADOS_EXTRAS` (feriados municipais, ex.: `10-24`). `COOKIE_SEGURO=1` já vem
+`INICIO_COBRANCAS` (já vem `2026-11`) e `FERIADOS_EXTRAS` (já vem com os de Formosa). `COOKIE_SEGURO=1` já vem
 ligado: o login só funciona entrando por `https://`. Para salvar e sair: Ctrl+O, Enter, Ctrl+X.
 
 `/home/documentos` é a pasta de documentos. Ela aparece no File Browser, que mostra `/home`.

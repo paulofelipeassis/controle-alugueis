@@ -21,13 +21,17 @@ def test_vencimento_efetivo():
     assert regras.vencimento_efetivo(date(2026, 10, 10)) == date(2026, 10, 13)  # sábado, domingo e feriado 12/10
     assert regras.vencimento_efetivo(date(2026, 4, 3)) == date(2026, 4, 6)      # sexta-feira santa
     assert regras.vencimento_efetivo(date(2026, 12, 25)) == date(2026, 12, 28)  # sexta, feriado, fim de semana
+    # 31/12 sem expediente bancário; 01/01 feriado; 02 e 03/01/2027 fim de semana.
+    assert regras.vencimento_efetivo(date(2026, 12, 31)) == date(2027, 1, 4)
+    assert date(2023, 12, 31) in regras.feriados(2023)
 
 
 def test_feriados_extras(monkeypatch):
-    monkeypatch.setattr(config, "FERIADOS_EXTRAS", "10-24, 2026-12-31")
-    assert regras.vencimento_efetivo(date(2027, 10, 22)) == date(2027, 10, 22)  # sexta comum
-    assert date(2026, 10, 24) in regras.feriados(2026) and date(2028, 10, 24) in regras.feriados(2028)
-    assert date(2026, 12, 31) in regras.feriados(2026) and date(2027, 12, 31) not in regras.feriados(2027)
+    monkeypatch.setattr(config, "FERIADOS_EXTRAS", "08-01, 11-30,12-08, 2026-12-30")  # Formosa + um dia avulso
+    assert date(2026, 8, 1) in regras.feriados(2026) and date(2028, 12, 8) in regras.feriados(2028)
+    assert regras.vencimento_efetivo(date(2026, 11, 30)) == date(2026, 12, 1)  # segunda, Dia do Evangélico
+    assert regras.vencimento_efetivo(date(2027, 11, 29)) == date(2027, 11, 29)  # segunda comum
+    assert date(2026, 12, 30) in regras.feriados(2026) and date(2027, 12, 30) not in regras.feriados(2027)
     monkeypatch.setattr(config, "FERIADOS_EXTRAS", "24/10")
     with pytest.raises(ErroDeNegocio, match="FERIADOS_EXTRAS"):
         regras.feriados(2026)
