@@ -23,6 +23,8 @@ def agora():
 
 
 def hoje():
+    if config.HOJE_FICTICIO:
+        return date.fromisoformat(config.HOJE_FICTICIO)
     return datetime.now(ZoneInfo(config.TZ)).date()
 
 

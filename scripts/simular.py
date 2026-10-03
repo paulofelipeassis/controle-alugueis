@@ -10,6 +10,7 @@ Uso: python -m scripts.simular          (banco temporário; não toca no banco r
 Também roda nos testes (sistema/tests/test_simulacao.py).
 """
 import random
+import sys
 import tempfile
 import time
 from datetime import date, timedelta
@@ -354,9 +355,15 @@ class Simulacao:
 
 
 def main():
-    pasta = Path(tempfile.mkdtemp())
-    config.DB_PATH = str(pasta / "simulacao.db")
-    config.DOCS_DIR = str(pasta / "documentos")
+    # --banco CAMINHO: grava a simulação nesse arquivo (para ver no site), em vez de um banco temporário.
+    if "--banco" in sys.argv:
+        config.DB_PATH = sys.argv[sys.argv.index("--banco") + 1]
+        if Path(config.DB_PATH).exists():
+            sys.exit(f"{config.DB_PATH} já existe: use um arquivo novo.")
+    else:
+        pasta = Path(tempfile.mkdtemp())
+        config.DB_PATH = str(pasta / "simulacao.db")
+        config.DOCS_DIR = str(pasta / "documentos")
     config.INICIO_COBRANCAS = "2026-10"
     inicio = time.time()
     sim = Simulacao()

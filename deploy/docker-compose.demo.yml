@@ -1,0 +1,18 @@
+# SÓ PARA DEMONSTRAÇÃO (branch descartável): o site com 15 meses de dados fictícios,
+# em http://ENDERECO:8090, com banco próprio em /opt/controle-alugueis/demo-dados.
+# Não usa o .env, não fala com o Hermes e não faz backup. Apagar com:
+#   docker compose -p demo -f docker-compose.demo.yml down
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: controle-alugueis-demo
+    ports: ["8090:8000"]
+    environment:
+      HOJE_FICTICIO: "2027-12-31"   # último dia da simulação
+      INICIO_COBRANCAS: "2026-10"   # como a simulação foi gerada
+      FERIADOS_EXTRAS: "08-01,11-30,12-08"
+      COOKIE_SEGURO: "0"            # http, sem HTTPS
+    volumes:
+      - /opt/controle-alugueis/demo-dados:/dados

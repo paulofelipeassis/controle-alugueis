@@ -22,3 +22,5 @@ BACKUP_HORA = int(os.environ.get("BACKUP_HORA", "3"))
 FERIADOS_EXTRAS = os.environ.get("FERIADOS_EXTRAS", "")
 # 1 quando o site é acessado por HTTPS (servidor): o cookie de login só viaja por conexão segura.
 COOKIE_SEGURO = os.environ.get("COOKIE_SEGURO", "0") == "1"
+# SÓ PARA DEMONSTRAÇÃO (branch descartável): "AAAA-MM-DD" congela a data de hoje do sistema.
+HOJE_FICTICIO = os.environ.get("HOJE_FICTICIO", "")
