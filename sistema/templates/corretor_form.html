@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import campo, texto %}
+{% block titulo %}Corretor · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>{% if editar %}Editar corretor{% else %}Novo corretor{% endif %}</h2>
-<form method="post">
+<p class="nota-obrigatorio">Campos com * são obrigatórios.</p>
+<form method="post" class="formulario">
   {{ campo("nome", "Nome", dados, obrigatorio=True) }}
   {{ campo("telefone", "Telefone", dados, tipo="tel") }}
   {{ campo("email", "E-mail", dados, tipo="email") }}

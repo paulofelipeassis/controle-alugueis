@@ -1,32 +1,36 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo %}
+{% block titulo %}{{ i.nome }} · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
-<h2>{{ i.nome }} {{ selo(i.situacao) }}</h2>
-<p>{{ i.endereco }}</p>
-<ul>
-  {% if i.iptu_anual_centavos %}<li>IPTU anual: {{ i.iptu_anual }}</li>{% endif %}
-  {% if i.medidor_saneago %}<li>Medidor Saneago: {{ i.medidor_saneago }}</li>{% endif %}
-  {% if i.medidor_enel %}<li>Medidor Enel: {{ i.medidor_enel }}</li>{% endif %}
-  {% if i.observacoes %}<li>{{ i.observacoes }}</li>{% endif %}
-</ul>
-<div class="acoes">
-  <a role="button" class="outline" href="/imoveis/{{ i.id }}/editar">Editar</a>
-  {% if not i.contrato_atual %}<a role="button" href="/contratos/novo?imovel_id={{ i.id }}">Novo contrato</a>{% endif %}
+<a class="voltar" href="/imoveis">← Imóveis</a>
+<div class="cabeca-pagina">
+  <h2>{{ i.nome }} {{ selo(i.situacao) }}</h2>
+  <div class="acoes">
+    <a role="button" class="outline" href="/imoveis/{{ i.id }}/editar">Editar</a>
+    {% if not i.contrato_atual %}<a role="button" href="/contratos/novo?imovel_id={{ i.id }}">Novo contrato</a>{% endif %}
+  </div>
 </div>
+<p class="subtitulo">{{ i.endereco }}</p>
+<dl class="ficha">
+  {% if i.iptu_anual_centavos %}<div><dt>IPTU anual</dt><dd>{{ i.iptu_anual }}</dd></div>{% endif %}
+  {% if i.medidor_saneago %}<div><dt>Medidor Saneago</dt><dd>{{ i.medidor_saneago }}</dd></div>{% endif %}
+  {% if i.medidor_enel %}<div><dt>Medidor Enel</dt><dd>{{ i.medidor_enel }}</dd></div>{% endif %}
+  {% if i.observacoes %}<div><dt>Observações</dt><dd>{{ i.observacoes }}</dd></div>{% endif %}
+</dl>
 <h3>Contratos</h3>
-<div class="overflow-auto"><table>
+<div class="overflow-auto"><table class="cartoes">
   <thead><tr><th>Locatário</th><th>Início</th><th>Fim</th><th>Situação</th></tr></thead>
   <tbody>
   {% for c in i.contratos %}
-  <tr><td><a href="/contratos/{{ c.id }}">{{ c.locatario_nome }}</a></td><td>{{ c.data_inicio|data }}</td>
-      <td>{{ (c.data_encerramento or c.data_fim_prevista)|data }}</td><td>{{ selo(c.status) }}</td></tr>
+  <tr><td class="titulo"><a href="/contratos/{{ c.id }}">{{ c.locatario_nome }}</a></td><td data-label="Início">{{ c.data_inicio|data }}</td>
+      <td data-label="Fim">{{ (c.data_encerramento or c.data_fim_prevista)|data }}</td><td data-label="Situação">{{ selo(c.status) }}</td></tr>
   {% else %}<tr><td colspan="4">Nenhum contrato.</td></tr>{% endfor %}
   </tbody>
 </table></div>
 {% if modulo_ativo("documentos") %}{% with entidade="imovel", entidade_id=i.id, voltar="/imoveis/" ~ i.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 {% if not i.contratos %}
 <form method="post" action="/imoveis/{{ i.id }}/apagar" onsubmit="return confirm('Apagar este imóvel?')">
-  <button type="submit" class="secondary outline">Apagar imóvel</button>
+  <button type="submit" class="secondary outline">Apagar imóvel (cadastrado por engano)</button>
 </form>
 {% endif %}
 {% endblock %}

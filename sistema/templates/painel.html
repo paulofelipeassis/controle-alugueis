@@ -1,57 +1,88 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo %}
+{% block titulo %}Painel · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
+{% set r = p.resumo_do_mes %}
+{% set pct_recebido = ((100 * r.recebido_centavos / r.devido_centavos)|round|int) if r.devido_centavos else 0 %}
 <h2>Painel</h2>
 {% if modulo_ativo("backup") %}{% include "backup/_faixa.html" %}{% endif %}
-{% if p.pendencias_abertas %}
-<div class="msg aviso"><a href="/pendencias"><strong>{{ p.pendencias_abertas }} pendência(s)</strong> para conferir →</a></div>
+{% if p.total_atrasado_centavos %}
+<a class="alerta-atraso" href="#atrasados">
+  <span><strong>{{ p.total_atrasado }}</strong> em atraso, de {{ p.inadimplentes|length }} contrato(s)</span>
+  <span>Ver quem está atrasado →</span>
+</a>
 {% endif %}
-<div class="numeros">
-  <article><small>Ocupação</small><strong>{{ p.ocupacao_pct }}%</strong>
-    <small>{{ p.imoveis_alugados }} alugados, {{ p.imoveis_vagos }} vagos{% if p.imoveis_reservados %}, {{ p.imoveis_reservados }} reservados{% endif %}{% if p.imoveis_em_manutencao %}, {{ p.imoveis_em_manutencao }} em manutenção{% endif %}</small></article>
-  <article><small>Devido em {{ p.resumo_do_mes.competencia|comp }}</small><strong>{{ p.resumo_do_mes.devido }}</strong></article>
-  <article><small>Recebido no mês</small><strong>{{ p.resumo_do_mes.recebido }}</strong></article>
-  <article><small>Falta receber no mês</small><strong>{{ p.resumo_do_mes.falta_receber }}</strong></article>
-  <article><small>Total atrasado</small><strong>{{ p.total_atrasado }}</strong></article>
-</div>
-<div class="acoes"><a role="button" href="/pagamentos/novo">Lançar pagamento</a></div>
+{% if p.pendencias_abertas %}
+<div class="msg aviso"><a href="/pendencias">{{ p.pendencias_abertas }} pendência(s) para conferir →</a></div>
+{% endif %}
 
-<h3>Atrasados</h3>
+<div class="resumo-mes">
+  <article>
+    <h3>Aluguéis de {{ r.competencia|comp_extenso }}</h3>
+    <span class="grande">{{ r.recebido }} <small class="legenda">recebidos de {{ r.devido }}</small></span>
+    <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_recebido }}" aria-label="Recebido no mês">
+      <span style="width: {{ pct_recebido }}%"></span></div>
+    <span class="legenda">{{ pct_recebido }}% recebido · falta receber <strong>{{ r.falta_receber }}</strong></span>
+  </article>
+  <article>
+    <h3>Ocupação</h3>
+    <span class="grande">{{ p.ocupacao_pct }}%</span>
+    <div class="barra marca-azul" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ p.ocupacao_pct }}" aria-label="Ocupação"><span style="width: {{ p.ocupacao_pct }}%"></span></div>
+    <span class="legenda">{{ p.imoveis_alugados }} alugados, {{ p.imoveis_vagos }} vagos{% if p.imoveis_reservados %}, {{ p.imoveis_reservados }} reservados{% endif %}{% if p.imoveis_em_manutencao %}, {{ p.imoveis_em_manutencao }} em manutenção{% endif %}</span>
+  </article>
+</div>
+
+<h3 id="atrasados">Atrasados</h3>
 {% if p.inadimplentes %}
-<div class="overflow-auto"><table>
+<div class="overflow-auto"><table class="cartoes">
   <thead><tr><th>Imóvel</th><th>Locatário</th><th>Meses</th><th class="num">Saldo</th><th class="num">Com multa e juros</th><th class="num">Atraso</th></tr></thead>
   <tbody>
   {% for g in p.inadimplentes %}
-  <tr><td><a href="/contratos/{{ g.contrato_id }}">{{ g.imovel_nome }}</a></td>
-      <td><a href="/locatarios/{{ g.locatario_id }}">{{ g.locatario_nome }}</a><br><small>{{ g.locatario_telefone or '' }}</small></td>
-      <td>{% for c in g.cobrancas %}<a href="/cobrancas/{{ c.id }}">{{ c.competencia|comp }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
-      <td class="num">{{ g.saldo }}</td><td class="num">{{ g.valor_atualizado }}</td><td class="num">{{ g.maior_atraso_dias }} dias</td></tr>
+  <tr><td class="titulo"><a href="/contratos/{{ g.contrato_id }}">{{ g.imovel_nome }}</a></td>
+      <td data-label="Locatário"><span><a href="/locatarios/{{ g.locatario_id }}">{{ g.locatario_nome }}</a>
+        {% if g.locatario_telefone %}<br><small><a href="tel:{{ g.locatario_telefone|tel }}">{{ g.locatario_telefone }}</a></small>{% endif %}</span></td>
+      <td data-label="Meses"><span>{% for c in g.cobrancas %}<a href="/cobrancas/{{ c.id }}">{{ c.competencia|comp }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span></td>
+      <td class="num" data-label="Saldo">{{ g.saldo }}</td><td class="num" data-label="Com multa e juros"><strong>{{ g.valor_atualizado }}</strong></td>
+      <td class="num" data-label="Atraso">{{ g.maior_atraso_dias }} dias</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
-{% else %}<p>Nenhum atraso. 🎉</p>{% endif %}
+{% else %}<p class="vazio">Nenhum atraso. 🎉</p>{% endif %}
 
 <h3>Alertas</h3>
 {% if p.alertas %}
-<ul>{% for a in p.alertas %}<li><a href="{% if a.cobranca_id %}/cobrancas/{{ a.cobranca_id }}{% else %}/contratos/{{ a.contrato_id }}{% endif %}">{{ a.mensagem }}</a></li>{% endfor %}</ul>
-{% else %}<p>Nenhum alerta.</p>{% endif %}
+{% macro alerta(a) %}<li><a href="{% if a.cobranca_id %}/cobrancas/{{ a.cobranca_id }}{% else %}/contratos/{{ a.contrato_id }}{% endif %}">{{ a.mensagem }}</a></li>{% endmacro %}
+<ul class="alertas">{% for a in p.alertas[:5] %}{{ alerta(a) }}{% endfor %}</ul>
+{% if p.alertas|length > 5 %}
+<details class="acao"><summary>Ver mais {{ p.alertas|length - 5 }} alerta(s)</summary>
+  <ul class="alertas" style="margin-bottom: 0.75rem;">{% for a in p.alertas[5:] %}{{ alerta(a) }}{% endfor %}</ul>
+</details>
+{% endif %}
+{% else %}<p class="vazio">Nenhum alerta.</p>{% endif %}
 
 <h3>Gráficos</h3>
-<div id="grafico-recebido" class="grafico"></div>
-<div id="grafico-imoveis" class="grafico"></div>
+<div class="graficos">
+  <article><div id="grafico-recebido" class="grafico" role="img" aria-label="Gráfico de barras: valor recebido por mês"></div></article>
+  <article><div id="grafico-imoveis" class="grafico" role="img" aria-label="Gráfico de pizza: situação dos imóveis"></div></article>
+</div>
 <script src="/static/plotly-basic.min.js"></script>
 <script>
   const recebido = {{ recebido|tojson }};
   const config = {displayModeBar: false, responsive: true};
+  const fonte = {family: "system-ui, sans-serif", color: "#33414e"};
   Plotly.newPlot("grafico-recebido", [{
-    type: "bar", x: recebido.map(r => r.mes.slice(5) + "/" + r.mes.slice(0, 4)),
-    y: recebido.map(r => r.recebido_centavos / 100), text: recebido.map(r => r.recebido), hoverinfo: "text",
-    marker: {color: "#1e88e5"}
-  }], {title: {text: "Recebido por mês"}, margin: {t: 40, l: 50, r: 10, b: 60}, yaxis: {tickprefix: "R$ "}}, config);
+    type: "bar", x: recebido.map(r => r.mes.slice(5) + "/" + r.mes.slice(2, 4)),
+    y: recebido.map(r => r.recebido_centavos / 100), customdata: recebido.map(r => r.recebido),
+    hovertemplate: "%{x}: %{customdata}<extra></extra>", marker: {color: "#0b5cad"}
+  }], {title: {text: "Recebido por mês", font: {size: 15}}, font: fonte, margin: {t: 40, l: 60, r: 10, b: 40},
+       yaxis: {tickprefix: "R$ ", tickformat: ",.0f", gridcolor: "#e3e8ee"}, xaxis: {type: "category", tickangle: -45},
+       paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)"}, config);
+  const imoveis = [["Alugados", {{ p.imoveis_alugados }}, "#2e7d32"], ["Reservados", {{ p.imoveis_reservados }}, "#6a4fc4"],
+                   ["Vagos", {{ p.imoveis_vagos }}, "#1e6fc0"], ["Em manutenção", {{ p.imoveis_em_manutencao }}, "#d98a00"]].filter(i => i[1] > 0);
   Plotly.newPlot("grafico-imoveis", [{
-    type: "pie", hole: 0.5, labels: ["Alugados", "Reservados", "Vagos", "Em manutenção"],
-    values: [{{ p.imoveis_alugados }}, {{ p.imoveis_reservados }}, {{ p.imoveis_vagos }}, {{ p.imoveis_em_manutencao }}],
-    marker: {colors: ["#43a047", "#7e57c2", "#1e88e5", "#fb8c00"]}
-  }], {title: {text: "Imóveis"}, margin: {t: 40, l: 10, r: 10, b: 10}}, config);
+    type: "pie", hole: 0.55, labels: imoveis.map(i => i[0]), values: imoveis.map(i => i[1]), marker: {colors: imoveis.map(i => i[2])},
+    textinfo: "value", sort: false
+  }], {title: {text: "Imóveis", font: {size: 15}}, font: fonte, margin: {t: 40, l: 10, r: 10, b: 10}, legend: {orientation: "h", y: -0.05},
+       paper_bgcolor: "rgba(0,0,0,0)"}, config);
 </script>
 {% endblock %}

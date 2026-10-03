@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import campo, texto, dinheiro %}
+{% block titulo %}Imóvel · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>{% if editar %}Editar imóvel{% else %}Novo imóvel{% endif %}</h2>
-<form method="post">
+<p class="nota-obrigatorio">Campos com * são obrigatórios.</p>
+<form method="post" class="formulario">
   {{ campo("grupo", "Grupo (prédio ou conjunto)", dados, obrigatorio=True, extra='list="grupos"', ajuda="Ex.: Anel Viário") }}
   <datalist id="grupos">{% for g in grupos %}<option value="{{ g }}">{% endfor %}</datalist>
   {{ campo("unidade", "Unidade", dados, obrigatorio=True, ajuda="Ex.: Apto 101") }}
