@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block titulo %}Histórico financeiro · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Histórico financeiro</h2>
 <form method="get">
@@ -11,17 +12,17 @@
     <label>Locatário <select name="locatario_id"><option value="">Todos</option>{% for l in locatarios %}<option value="{{ l.id }}" {% if filtros.locatario_id == l.id|string %}selected{% endif %}>{{ l.nome }}</option>{% endfor %}</select></label>
   </div>
   <label><input type="checkbox" name="cancelados" {% if filtros.cancelados %}checked{% endif %}> Mostrar cancelados</label>
-  <button type="submit">Filtrar</button>
+  <button type="submit" class="secondary">Filtrar</button>
 </form>
-<p>{{ h.quantidade }} pagamento(s) · total: <strong>{{ h.total }}</strong></p>
-<div class="overflow-auto"><table>
-  <thead><tr><th>Data</th><th>Imóvel</th><th>Locatário</th><th>Mês</th><th class="num">Valor</th><th>Forma</th><th>Por</th></tr></thead>
+<p class="resumo-linha"><strong>{{ h.quantidade }}</strong> pagamento(s) · total: <strong>{{ h.total }}</strong></p>
+<div class="overflow-auto"><table class="cartoes">
+  <thead><tr><th>Imóvel</th><th>Locatário</th><th>Data</th><th>Mês</th><th class="num">Valor</th><th>Forma</th><th>Registrado por</th></tr></thead>
   <tbody>
   {% for p in h.pagamentos %}
-  <tr>{% if p.cancelado_em %}<td><s>{{ p.data_pagamento|data }}</s> <small>cancelado</small></td>{% else %}<td>{{ p.data_pagamento|data }}</td>{% endif %}
-      <td>{{ p.imovel_nome }}</td><td>{{ p.locatario_nome }}</td>
-      <td><a href="/cobrancas/{{ p.cobranca_id }}">{{ p.competencia|comp }}</a></td><td class="num">{{ p.valor }}</td>
-      <td>{{ dict(FORMAS).get(p.forma) }}</td><td>{{ p.registrado_por }}</td></tr>
+  <tr><td class="titulo">{{ p.imovel_nome }}</td><td data-label="Locatário">{{ p.locatario_nome }}</td>
+      {% if p.cancelado_em %}<td data-label="Data"><span><s>{{ p.data_pagamento|data }}</s> <small>cancelado</small></span></td>{% else %}<td data-label="Data">{{ p.data_pagamento|data }}</td>{% endif %}
+      <td data-label="Mês"><a href="/cobrancas/{{ p.cobranca_id }}">{{ p.competencia|comp }}</a></td><td class="num" data-label="Valor">{{ p.valor }}</td>
+      <td data-label="Forma">{{ dict(FORMAS).get(p.forma) }}</td><td data-label="Registrado por">{{ p.registrado_por }}</td></tr>
   {% else %}<tr><td colspan="7">Nenhum pagamento.</td></tr>{% endfor %}
   </tbody>
 </table></div>

@@ -1,25 +1,31 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo, dinheiro %}
+{% block titulo %}{{ c.imovel_nome }} · Contrato · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
-<h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
-<p><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · {{ c.locatario_telefone }}{% endif %}</p>
+<a class="voltar" href="/contratos">← Contratos</a>
+<div class="cabeca-pagina">
+  <h2>{{ c.imovel_nome }} {{ selo(c.status) }}</h2>
+  <a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a>
+</div>
+<p class="subtitulo"><a href="/locatarios/{{ c.locatario_id }}">{{ c.locatario_nome }}</a> · {{ c.locatario_email }}{% if c.locatario_telefone %} · <a href="tel:{{ c.locatario_telefone|tel }}">{{ c.locatario_telefone }}</a>{% endif %}</p>
 {% if modulo_ativo("proporcional") %}{% include "proporcional/_bloco.html" %}{% endif %}
 {% if c.prazo_vencido %}<div class="msg aviso">O prazo terminou em {{ c.data_fim_prevista|data }}. O contrato continua valendo e gerando cobranças até ser renovado ou encerrado.</div>{% endif %}
-<ul>
-  <li>Aluguel atual: <strong>{{ c.valor_atual }}</strong> (desde {{ c.valor_atual_desde|data }}), vence todo dia {{ c.dia_vencimento }}</li>
-  <li>Início {{ c.data_inicio|data }} · fim previsto {{ c.data_fim_prevista|data }}{% if c.data_encerramento %} · encerrado em {{ c.data_encerramento|data }} ({{ c.motivo_encerramento }}){% endif %}</li>
-  <li>Multa {{ c.multa_pct|pct }}% · juros {{ c.juros_mes_pct|pct }}% ao mês · reajuste: {{ c.indice_reajuste or 'não informado' }}</li>
-  <li>Garantia: {{ dict(GARANTIAS).get(c.garantia_tipo) }}{% if c.garantia_valor_centavos %} de {{ c.garantia_valor }}{% endif %}{% if c.fiador %} · Fiador: {{ c.fiador }}{% endif %}</li>
-  {% if c.corretor_nome %}<li>Corretor: {{ c.corretor_nome }}</li>{% endif %}
-  {% if c.observacoes %}<li>{{ c.observacoes }}</li>{% endif %}
-</ul>
 <div class="numeros">
-  <article><small>Total devido</small><strong>{{ c.total_devido }}</strong></article>
+  <article><small>Aluguel atual</small><strong>{{ c.valor_atual }}</strong><small>vence todo dia {{ c.dia_vencimento }}</small></article>
+  <article class="{% if c.total_atrasado_centavos %}ruim{% else %}bom{% endif %}"><small>Atrasado</small><strong>{{ c.total_atrasado }}</strong></article>
   <article><small>Total pago</small><strong>{{ c.total_pago }}</strong></article>
-  <article><small>Atrasado</small><strong>{{ c.total_atrasado }}</strong></article>
+  <article><small>Total devido</small><strong>{{ c.total_devido }}</strong></article>
 </div>
-
-<div class="acoes"><a role="button" class="outline" href="/contratos/{{ c.id }}/editar">Editar</a></div>
+<dl class="ficha">
+  <div><dt>Aluguel atual desde</dt><dd>{{ c.valor_atual_desde|data }}</dd></div>
+  <div><dt>Período</dt><dd>{{ c.data_inicio|data }} a {{ c.data_fim_prevista|data }}{% if c.data_encerramento %}<br>Encerrado em {{ c.data_encerramento|data }} ({{ c.motivo_encerramento }}){% endif %}</dd></div>
+  <div><dt>Multa e juros por atraso</dt><dd>{{ c.multa_pct|pct }}% de multa · {{ c.juros_mes_pct|pct }}% ao mês</dd></div>
+  <div><dt>Índice de reajuste</dt><dd>{{ c.indice_reajuste or 'não informado' }}</dd></div>
+  <div><dt>Garantia</dt><dd>{{ dict(GARANTIAS).get(c.garantia_tipo) }}{% if c.garantia_valor_centavos %} de {{ c.garantia_valor }}{% endif %}{% if c.fiador %}<br>Fiador: {{ c.fiador }}{% endif %}</dd></div>
+  {% if c.corretor_nome %}<div><dt>Corretor</dt><dd>{{ c.corretor_nome }}</dd></div>{% endif %}
+  {% if c.observacoes %}<div><dt>Observações</dt><dd>{{ c.observacoes }}</dd></div>{% endif %}
+</dl>
+{% if c.status == "encerrado" or c.status == "ativo" %}<h3>Ações</h3>{% endif %}
 {% if c.status == "encerrado" %}
 <details class="acao"><summary>Reabrir contrato (encerrei por engano)</summary>
   <form method="post" action="/contratos/{{ c.id }}/reabrir" onsubmit="return confirm('Reabrir este contrato?')">
@@ -65,15 +71,16 @@
 {% endif %}
 
 <h3>Cobranças</h3>
-<div class="overflow-auto"><table>
-  <thead><tr><th>Mês</th><th>Situação</th><th class="num">Saldo</th><th>Vencimento</th><th class="num">Valor</th><th class="num">Pago</th><th>Boleto</th></tr></thead>
+<div class="overflow-auto"><table class="cartoes">
+  <thead><tr><th>Mês</th><th>Vencimento</th><th class="num">Valor</th><th class="num so-desktop">Pago</th><th class="num">Saldo</th><th class="so-desktop">Boleto</th></tr></thead>
   <tbody>
   {% for cb in c.cobrancas|reverse %}
-  <tr><td><a href="/cobrancas/{{ cb.id }}">{{ cb.competencia|comp }}</a></td><td>{{ selo(cb.situacao_calculada) }}</td>
-      <td class="num">{{ cb.saldo }}</td><td>{{ cb.vencimento|data }}</td>
-      <td class="num">{{ cb.valor }}</td><td class="num">{{ cb.pago }}</td>
-      <td>{% if cb.boleto_identificador %}{{ cb.boleto_identificador }}{% endif %}</td></tr>
-  {% else %}<tr><td colspan="7">Nenhuma cobrança ainda.</td></tr>{% endfor %}
+  <tr><td class="titulo"><a href="/cobrancas/{{ cb.id }}">{{ cb.competencia|comp }}</a> {{ selo(cb.situacao_calculada) }}</td>
+      <td data-label="Vencimento">{{ cb.vencimento|data }}</td>
+      <td class="num" data-label="Valor">{{ cb.valor }}</td><td class="num so-desktop" data-label="Pago">{{ cb.pago }}</td>
+      <td class="num" data-label="Saldo">{{ cb.saldo }}</td>
+      <td class="so-desktop" data-label="Boleto">{% if cb.boleto_identificador %}{{ cb.boleto_identificador }}{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6">Nenhuma cobrança ainda.</td></tr>{% endfor %}
   </tbody>
 </table></div>
 
@@ -83,7 +90,10 @@
 {% if modulo_ativo("caucao") %}{% include "caucao/_bloco.html" %}{% endif %}
 {% if modulo_ativo("documentos") %}{% with entidade="contrato", entidade_id=c.id, voltar="/contratos/" ~ c.id %}{% include "documentos/_bloco.html" %}{% endwith %}{% endif %}
 
-<form method="post" action="/contratos/{{ c.id }}/apagar" onsubmit="return confirm('Apagar este contrato? Só funciona se foi cadastrado por engano, sem pagamentos.')">
-  <button type="submit" class="secondary outline">Apagar contrato (cadastrado por engano)</button>
-</form>
+<details class="acao perigo" style="margin-top: 2rem;"><summary>Cadastrei este contrato por engano</summary>
+  <form method="post" action="/contratos/{{ c.id }}/apagar" onsubmit="return confirm('Apagar este contrato? Só funciona se foi cadastrado por engano, sem pagamentos.')">
+    <p><small>Só funciona se o contrato não tem pagamentos. Se ele existiu de verdade, use <strong>Encerrar</strong> acima.</small></p>
+    <button type="submit" class="perigo">Apagar contrato</button>
+  </form>
+</details>
 {% endblock %}

@@ -1,20 +1,21 @@
 {% extends "base.html" %}
+{% block titulo %}Auditoria · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Auditoria</h2>
-<form method="get" class="grid">
+<form method="get" class="filtro">
   <label>Tipo
     <select name="entidade"><option value="">Tudo</option>
       {% for e in ['imovel','locatario','corretor','contrato','cobranca','pagamento','pendencia','usuario'] %}<option {% if entidade == e %}selected{% endif %}>{{ e }}</option>{% endfor %}
     </select>
   </label>
-  <label>&nbsp;<button type="submit">Filtrar</button></label>
+  <button type="submit" class="secondary">Filtrar</button>
 </form>
-<div class="overflow-auto"><table>
-  <thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr></thead>
+<div class="overflow-auto"><table class="cartoes">
+  <thead><tr><th>O quê</th><th>Quando</th><th>Quem</th><th>Detalhes</th></tr></thead>
   <tbody>
   {% for r in registros %}
-  <tr><td>{{ r.quando|data }}</td><td>{{ r.quem }}</td><td>{{ r.acao|replace('_', ' ') }}{% if r.entidade_id %} #{{ r.entidade_id }}{% endif %}</td>
-      <td><small>{{ r.detalhes or '' }}</small></td></tr>
+  <tr><td class="titulo">{{ r.acao|replace('_', ' ') }}{% if r.entidade_id %} #{{ r.entidade_id }}{% endif %}</td><td data-label="Quando">{{ r.quando|data }}</td><td data-label="Quem">{{ r.quem }}</td>
+      <td data-label="Detalhes"><small>{{ r.detalhes or '' }}</small></td></tr>
   {% endfor %}
   </tbody>
 </table></div>
