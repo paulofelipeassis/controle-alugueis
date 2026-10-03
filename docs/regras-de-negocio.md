@@ -150,13 +150,16 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
 - **Vencimento** = dia de vencimento do contrato naquele mês. Se o mês não tem esse dia
   (29, 30, 31), vence no **último dia do mês**.
 - **Vencimento em dia sem expediente bancário** (sábado, domingo, feriado nacional, Carnaval,
-  Sexta-feira Santa, Corpus Christi, e os dias de `FERIADOS_EXTRAS`): o locatário pode pagar até o
+  Sexta-feira Santa, Corpus Christi, 31/12, e os dias de `FERIADOS_EXTRAS`): o locatário pode pagar até o
   **primeiro dia útil seguinte** sem multa nem juros. A cobrança só fica atrasada, e a multa e os
   juros só contam, a partir daí. Base: regra dos boletos bancários e Código Civil, art. 132, §1º
   ("se o dia do vencimento cair em feriado, considerar-se-á prorrogado o prazo até o seguinte dia
   útil"). Sem isso, o boleto pago na segunda-feira de um vencimento de sábado apareceria como
-  atrasado e geraria pendência falsa. Feriados municipais (ex.: 24/10 em Goiânia) entram em
-  `FERIADOS_EXTRAS`.
+  atrasado e geraria pendência falsa. Feriados municipais entram em `FERIADOS_EXTRAS`. Os imóveis
+  ficam em **Formosa-GO**: 01/08 (Data Magna do município), 30/11 (Dia do Evangélico) e 08/12
+  (padroeira, N. Sra. da Imaculada Conceição), segundo a Câmara Municipal de Formosa. Na dúvida se um
+  feriado municipal vale para o banco, ele entra: o pior caso é o locatário pagar um dia depois sem
+  multa, contra uma pendência falsa de atraso no caso contrário.
 - **Primeira cobrança** = o primeiro vencimento **a partir da data de início** do contrato, com o aluguel
   cheio. Se o contrato começou no meio do mês, o módulo opcional `proporcional` pergunta (aviso no
   painel e bloco na página do contrato, até alguém decidir) se ela deve cobrar só os dias usados do mês
@@ -165,10 +168,9 @@ cobrança.** Essa é a peça central do sistema novo (na planilha, o pagamento e
   sistema já cobra, e enquanto a cobrança está intocada (sem boleto, sem pagamento, valor do aluguel).
   O sistema **nunca decide sozinho**: como cada contrato cobra o primeiro período é decisão de quem
   conhece o contrato.
-- **Início das cobranças no sistema:** parâmetro `INICIO_COBRANCAS` (combinado: outubro de
-  2026, `2026-10`). Nenhuma cobrança é gerada antes disso. Se o sistema entrar no ar mais
-  tarde, o Paulo define o novo valor na hora (para não gerar como "atrasadas" cobranças que
-  já foram pagas pelo sistema antigo).
+- **Início das cobranças no sistema:** parâmetro `INICIO_COBRANCAS` = **novembro de 2026
+  (`2026-11`)**, decidido pelo Paulo em 03/10/2026: outubro fecha no sistema antigo (Streamlit) e o novo
+  assume a partir de novembro, sem cobrança em dobro. Nenhuma cobrança é gerada antes disso.
 - **Geração automática e idempotente:** o sistema gera as cobranças que faltam para todo
   contrato, até 30 dias à frente. Rodar a geração duas vezes não duplica nada (um contrato
   só tem uma cobrança por competência).

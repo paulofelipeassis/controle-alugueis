@@ -131,7 +131,7 @@ Lê variáveis de ambiente com valores padrão para desenvolvimento:
 |---|---|---|
 | `DB_PATH` | `dados/alugueis.db` | arquivo do banco |
 | `DOCS_DIR` | `dados/documentos` | pasta de documentos |
-| `INICIO_COBRANCAS` | `2026-10` | primeira competência gerada |
+| `INICIO_COBRANCAS` | `2026-11` | primeira competência gerada (decidido: novembro/2026) |
 | `SESSION_SECRET` | (obrigatória na Etapa 5) | cookie de login |
 | `MCP_TOKEN` | (obrigatória na Etapa 3) | senha do Hermes no MCP |
 | `TZ` | `America/Sao_Paulo` | fuso |
@@ -689,8 +689,7 @@ pendências e upload.
 
 1. Domínio: o Paulo registra na Hostinger; apontar o registro DNS `A` para o IP do servidor;
    trocar o endereço nas configurações do Traefik (HTTPS automático).
-2. Definir com o Paulo o valor final de `INICIO_COBRANCAS` (regras §5) antes das cobranças
-   reais.
+2. ~~Definir com o Paulo o valor final de `INICIO_COBRANCAS`~~ Decidido: `2026-11` (regras §5).
 3. Uma semana usando os dois sistemas; o Paulo confirma que o novo cobre tudo.
 4. Só depois da confirmação dele: desligar o app no Streamlit Cloud; remover `app.py`,
    `auth_utils.py`, `data_access.py`, `pages/`, `scripts/generate_keys.py` e o

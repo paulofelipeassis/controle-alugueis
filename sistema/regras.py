@@ -112,6 +112,8 @@ def feriados(ano):
     dias = {date(ano, m, d) for m, d in [(1, 1), (4, 21), (5, 1), (9, 7), (10, 12), (11, 2), (11, 15), (12, 25)]}
     if ano >= 2024:  # Dia da Consciência Negra virou feriado nacional (Lei 14.759/2023)
         dias.add(date(ano, 11, 20))
+    # 31/12: sem expediente bancário ao público, todo ano (Febraban; calendário da Resolução CMN 4.880/2020).
+    dias.add(date(ano, 12, 31))
     p = pascoa(ano)
     dias |= {p - timedelta(days=48), p - timedelta(days=47),  # carnaval (segunda e terça)
              p - timedelta(days=2),                           # sexta-feira santa
