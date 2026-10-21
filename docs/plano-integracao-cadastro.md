@@ -78,7 +78,8 @@ própria:
 |---|---|
 | Documento do imóvel | `imobiliaria/imoveis/<pasta do cadastro>/...` (subpastas do Hermes) |
 | Contrato, vistoria, aditivo | `imobiliaria/imoveis/<pasta do cadastro>/contratos/` |
-| Comprovante de pagamento | Junto do imóvel (subpasta a confirmar com a convenção do Hermes) |
+| Comprovante de pagamento | Junto do imóvel (subpasta a confirmar com a convenção do Hermes): é prova do que foi pago, guarda-se para sempre |
+| **Boleto** | **Fica só no sistema** (decisão do Paulo, 21/10/2026): banco, nosso número, linha digitável e link já são campos da cobrança. O PDF é efêmero (o banco gera de novo); não vai para as pastas do Hermes |
 | Documentos do locatário | `imobiliaria/clientes/` — **o padrão dessa pasta ainda não foi definido no Hermes**; definir junto, antes do primeiro contrato |
 
 - O **nome da pasta do imóvel vem do cadastro** (campo `pasta`), nunca é calculado pelo sistema.
