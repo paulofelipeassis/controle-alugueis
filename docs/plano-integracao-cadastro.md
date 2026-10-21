@@ -18,6 +18,24 @@ do **aluguel**: locatário, contrato, valores, cobranças, boletos, pagamentos, 
 | Imóvel que vira aluguel precisa ser copiado | Aparece no sistema na hora |
 | Imóvel vendido precisa ser tirado do sistema | Sai da lista de alugáveis na hora |
 
+### O que fica onde
+
+**Os contratos continuam inteiros no sistema de aluguéis.** Só a lista de imóveis deixa de
+existir nele.
+
+| Cadastro do Hermes | Sistema de aluguéis (como já estava preparado) |
+|---|---|
+| O imóvel em si: ID, apelido, tipo, finalidade, vendido ou não, UCs, IPTU, pasta | **Locatário:** nome, CPF/CNPJ, telefone, e-mail |
+| | **Contrato:** início, fim, vencimento, multa, juros, garantia, caução, fiador, índice |
+| | **Valor do aluguel** com o histórico de reajustes |
+| | **Cobranças, boletos, pagamentos, pendências** e todas as regras |
+
+O contrato só passa a apontar para o imóvel pelo ID do Hermes (`RIF-101`). O Hermes **não guarda
+contratos**: quando um operador pede um contrato, o Hermes o cadastra **no sistema**, pelo MCP, e
+o sistema confere as regras (princípio 1 de `regras-de-negocio.md`: o Hermes é o mensageiro).
+
+**Arquivos:** as únicas pastas são as do Hermes (decisão do Paulo, 21/10/2026). Ver seção 3b.
+
 ## 2. Como o sistema lê o cadastro
 
 - O Hermes já grava, a cada mudança, uma cópia legível do cadastro:
@@ -49,6 +67,26 @@ do **aluguel**: locatário, contrato, valores, cobranças, boletos, pagamentos, 
 
 **Situação (Alugado / Reservado / Em manutenção / Vago)** continua calculada como hoje. A única
 diferença é de onde vem a lista.
+
+## 3b. Pastas de documentos: só as do Hermes
+
+Hoje o sistema aponta para `/home/documentos`, que está **vazia**. Os documentos de verdade
+estão em `imobiliaria/` do Hermes. O sistema passa a usar essa pasta, e deixa de ter convenção
+própria:
+
+| Arquivo | Onde fica |
+|---|---|
+| Documento do imóvel | `imobiliaria/imoveis/<pasta do cadastro>/...` (subpastas do Hermes) |
+| Contrato, vistoria, aditivo | `imobiliaria/imoveis/<pasta do cadastro>/contratos/` |
+| Comprovante de pagamento | Junto do imóvel (subpasta a confirmar com a convenção do Hermes) |
+| Documentos do locatário | `imobiliaria/clientes/` — **o padrão dessa pasta ainda não foi definido no Hermes**; definir junto, antes do primeiro contrato |
+
+- O **nome da pasta do imóvel vem do cadastro** (campo `pasta`), nunca é calculado pelo sistema.
+- Os nomes de arquivo seguem a nomenclatura do Hermes (`estrutura-e-nomenclatura.md`).
+- O upload pela web continua existindo (redundância, princípio 4).
+- Os containers do sistema passam a gravar como o **mesmo usuário do Hermes** (uid 10000). Sem
+  isso, um arquivo enviado pela web ficaria com outro dono e o Hermes não conseguiria mexer nele.
+- `docs/estrutura-de-pastas.md` deixa de valer: passa a apontar para a convenção do Hermes.
 
 ### Avisos novos no painel (no lugar da conciliação mensal)
 
@@ -90,15 +128,10 @@ O documento de regras pede para não mudar decisões sem perguntar. Estas mudam:
 1. **§1** — "O Hermes recadastra imóveis" no sistema: deixa de existir; o imóvel já está no cadastro.
 2. **§3, Imóvel** — campos grupo, unidade, IPTU anual e medidores: substituídos pelo cadastro do Hermes.
 3. **§11** — o Hermes **não** cadastra imóvel pelo MCP (cadastra pelo `cadastro.py`, do lado dele).
-4. **§9, Documentos** — hoje "o **sistema** é dono da convenção de pastas", e a pasta de documentos
-   do sistema (`/home/documentos`) está **vazia**, enquanto os documentos de verdade estão nas pastas
-   do Hermes (`imobiliaria/imoveis/<pasta>`). Proposta: o sistema passa a usar as pastas do Hermes e
-   a pasta do imóvel vem do cadastro (`pasta`). **É uma segunda unificação**; pode ficar para depois
-   de novembro sem prejudicar os boletos. Os comprovantes de pagamento continuam funcionando onde
-   estão.
+4. **§9, Documentos** — "o **sistema** é dono da convenção de pastas" deixa de valer. **Decidido pelo
+   Paulo (21/10/2026): as únicas pastas são as do Hermes** (seção 3b).
 
 ## 7. Depois deste plano (não entra agora)
 
-- Unificar as pastas de documentos (item 4 acima), se o Paulo aprovar.
 - API de boletos da Caixa.
 - IPTU proporcional repassado ao locatário (depois de novembro).
