@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% block titulo %}Pendências · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Pendências</h2>
-<div class="acoes">
-  <a role="button" class="outline" href="/pendencias">Abertas</a>
-  <a role="button" class="outline" href="/pendencias?todas=1">Todas</a>
-</div>
+<nav class="filtros" aria-label="Filtrar pendências">
+  <a href="/pendencias"{% if not todas %} aria-current="true"{% endif %}>Abertas</a>
+  <a href="/pendencias?todas=1"{% if todas %} aria-current="true"{% endif %}>Todas</a>
+</nav>
 {% for p in pendencias %}
 <article>
   <strong>{{ p.tipo|replace('_', ' ')|capitalize }}</strong> <small>· {{ p.criada_em|data }} · por {{ p.criada_por }}</small>
@@ -20,5 +21,5 @@
   </form>
   {% endif %}
 </article>
-{% else %}<p>Nenhuma pendência. 🎉</p>{% endfor %}
+{% else %}<p class="vazio">Nenhuma pendência. 🎉</p>{% endfor %}
 {% endblock %}

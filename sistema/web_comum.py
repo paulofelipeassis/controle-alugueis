@@ -34,6 +34,17 @@ templates.env.filters["reais_campo"] = lambda c: regras.formatar_reais(c).remove
 templates.env.filters["data"] = _data
 templates.env.filters["pct"] = lambda v: f"{float(v):g}".replace(".", ",") if v not in (None, "") else ""
 templates.env.filters["comp"] = lambda c: f"{c[5:7]}/{c[0:4]}" if c else ""
+MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _tel(telefone):
+    """Número para o link tel: (celular e fixo do Brasil; já com +55 fica como está)."""
+    digitos = "".join(c for c in str(telefone or "") if c.isdigit())
+    return f"+55{digitos}" if len(digitos) in (10, 11) else digitos
+
+
+templates.env.filters["comp_extenso"] = lambda c: f"{MESES[int(c[5:7]) - 1]} de {c[0:4]}" if c else ""
+templates.env.filters["tel"] = _tel
 _ATIVOS = set(modulos.nomes())
 templates.env.globals.update(FORMAS=FORMAS, GARANTIAS=GARANTIAS, SITUACOES_COBRANCA=SITUACOES_COBRANCA,
                              ROTULOS=consultas.ROTULOS_SITUACAO, modulo_ativo=lambda nome: nome in _ATIVOS)

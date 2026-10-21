@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% from "_macros.html" import selo %}
+{% block titulo %}Imóveis · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
-<h2>Imóveis</h2>
-<div class="acoes">
-  <a role="button" href="/imoveis/novo">Novo imóvel</a>
-  <a role="button" class="outline" href="/imoveis">Todos</a>
-  <a role="button" class="outline" href="/imoveis?situacao=vago">Vagos</a>
-  <a role="button" class="outline" href="/imoveis?situacao=alugado">Alugados</a>
-  <a role="button" class="outline" href="/imoveis?situacao=reservado">Reservados</a>
-</div>
-<div class="overflow-auto"><table>
+<div class="cabeca-pagina"><h2>Imóveis</h2><a role="button" href="/imoveis/novo">Novo imóvel</a></div>
+<nav class="filtros" aria-label="Filtrar imóveis">
+  <a href="/imoveis"{% if not situacao %} aria-current="true"{% endif %}>Todos</a>
+  <a href="/imoveis?situacao=vago"{% if situacao == "vago" %} aria-current="true"{% endif %}>Vagos</a>
+  <a href="/imoveis?situacao=alugado"{% if situacao == "alugado" %} aria-current="true"{% endif %}>Alugados</a>
+  <a href="/imoveis?situacao=reservado"{% if situacao == "reservado" %} aria-current="true"{% endif %}>Reservados</a>
+</nav>
+<div class="overflow-auto"><table class="cartoes">
   <thead><tr><th>Imóvel</th><th>Situação</th><th>Locatário</th></tr></thead>
   <tbody>
   {% for i in imoveis %}
-  <tr><td><a href="/imoveis/{{ i.id }}">{{ i.nome }}</a></td><td>{{ selo(i.situacao) }}</td>
-      <td>{% if i.locatario_id %}<a href="/locatarios/{{ i.locatario_id }}">{{ i.locatario_nome }}</a>{% endif %}</td></tr>
+  <tr><td class="titulo"><a href="/imoveis/{{ i.id }}">{{ i.nome }}</a></td><td data-label="Situação">{{ selo(i.situacao) }}</td>
+      <td data-label="Locatário">{% if i.locatario_id %}<a href="/locatarios/{{ i.locatario_id }}">{{ i.locatario_nome }}</a>{% else %}—{% endif %}</td></tr>
   {% else %}<tr><td colspan="3">Nenhum imóvel.</td></tr>{% endfor %}
   </tbody>
 </table></div>

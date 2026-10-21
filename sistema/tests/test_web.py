@@ -27,7 +27,7 @@ def _id(resposta, prefixo):
 def test_fluxo_completo(cliente):
     r = cliente.post("/imoveis/novo", data={"grupo": "Anel Viário", "unidade": "Apto 101", "endereco": "Rua A",
                                             "iptu_anual": "1.200,00"})
-    assert "Imóvel cadastrado" in r.text and "IPTU anual: R$ 1.200,00" in r.text
+    assert "Imóvel cadastrado" in r.text and "<dt>IPTU anual</dt><dd>R$ 1.200,00</dd>" in r.text
     imovel = _id(r, "/imoveis")
     r = cliente.post("/locatarios/novo", data={"nome": "Maria Souza", "cpf_cnpj": "123.456.789-00",
                                                "email": "maria@x.com", "telefone": "62 99999-0000"})

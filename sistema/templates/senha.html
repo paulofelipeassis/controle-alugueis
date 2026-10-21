@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% block titulo %}Trocar senha · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>Trocar senha</h2>
-<form method="post" action="/senha" style="max-width: 24rem;">
+<form method="post" action="/senha" class="formulario">
   <label>Senha atual <input type="password" name="atual" required></label>
   <label>Nova senha (mínimo 8 caracteres) <input type="password" name="nova" minlength="8" required></label>
   <label>Repita a nova senha <input type="password" name="repetir" minlength="8" required></label>

@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 {% from "_macros.html" import campo, texto, dinheiro %}
+{% block titulo %}{% if editar %}Editar contrato{% else %}Novo contrato{% endif %} · Controle de Aluguéis{% endblock %}
 {% block conteudo %}
 <h2>{% if editar %}Editar contrato{% else %}Novo contrato{% endif %}</h2>
-<form method="post">
+<p class="nota-obrigatorio">Campos com * são obrigatórios.</p>
+<form method="post" class="formulario">
   {% if editar %}
   <p><strong>{{ dados.imovel_nome }} — {{ dados.locatario_nome }}</strong><br>
   <small>Início, dia de vencimento e valor não mudam por aqui: use reajuste, renovar ou encerrar na página do contrato. Se algum deles foi cadastrado errado e ainda não há pagamento nem boleto, apague o contrato e cadastre de novo.</small></p>
   {{ campo("data_fim_prevista", "Fim previsto (correção)", dados, tipo="date") }}
   {% else %}
+  <fieldset class="grupo"><legend>Quem e onde</legend>
   <label>Imóvel (vago ou em manutenção) *
     <select name="imovel_id" required>
       <option value="">Escolha…</option>
@@ -20,6 +23,8 @@
       {% for l in locatarios %}<option value="{{ l.id }}" {% if dados.get('locatario_id')|string == l.id|string %}selected{% endif %}>{{ l.nome }} ({{ l.cpf_cnpj }})</option>{% endfor %}
     </select>
   </label>
+  </fieldset>
+  <fieldset class="grupo"><legend>Prazo e valor</legend>
   <div class="grid">
     {{ campo("data_inicio", "Início", dados, tipo="date", obrigatorio=True) }}
     {{ campo("data_fim_prevista", "Fim previsto", dados, tipo="date", obrigatorio=True) }}
@@ -30,7 +35,9 @@
   </div>
   {{ campo("valor_vigente_desde", "O valor atual vale desde (data do último reajuste)", dados, tipo="date",
            ajuda="Só para contrato que começou há mais de 1 ano. Em branco: vale desde o início. O próximo reajuste é calculado a partir desta data.") }}
+  </fieldset>
   {% endif %}
+  <fieldset class="grupo"><legend>Condições</legend>
   <label>Corretor
     <select name="corretor_id">
       <option value="">Nenhum</option>
@@ -51,6 +58,7 @@
   {{ campo("indice_reajuste", "Índice de reajuste", dados, extra='list="indices"') }}
   <datalist id="indices"><option value="IGP-M"><option value="IPCA"></datalist>
   {{ texto("observacoes", "Observações", dados) }}
-  <button type="submit">Salvar</button>
+  </fieldset>
+  <button type="submit">Salvar contrato</button>
 </form>
 {% endblock %}
