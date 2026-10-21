@@ -80,7 +80,7 @@ própria:
 | Contrato, vistoria, aditivo | `imobiliaria/imoveis/<pasta do cadastro>/contratos/` |
 | Comprovante de pagamento | Junto do imóvel (subpasta a confirmar com a convenção do Hermes): é prova do que foi pago, guarda-se para sempre |
 | **Boleto** | **Fica só no sistema** (decisão do Paulo, 21/10/2026): banco, nosso número, linha digitável e link já são campos da cobrança. O PDF é efêmero (o banco gera de novo); não vai para as pastas do Hermes |
-| Documentos do locatário | `imobiliaria/clientes/` — **o padrão dessa pasta ainda não foi definido no Hermes**; definir junto, antes do primeiro contrato |
+| Documentos do locatário | **O Hermes guarda, para sempre**, em `imobiliaria/clientes/` (ideia do Paulo, 21/10/2026). O Hermes lê os documentos e manda **só os dados** (nome, CPF/CNPJ, telefone, e-mail) ao sistema. O padrão da pasta ainda não foi definido no Hermes: definir antes do primeiro contrato, com o CPF/CNPJ no nome da pasta |
 
 - O **nome da pasta do imóvel vem do cadastro** (campo `pasta`), nunca é calculado pelo sistema.
 - Os nomes de arquivo seguem a nomenclatura do Hermes (`estrutura-e-nomenclatura.md`).
@@ -127,7 +127,7 @@ plano B que cadastre contratos antes, porque seria cadastrar imóvel em dobro de
 O documento de regras pede para não mudar decisões sem perguntar. Estas mudam:
 
 1. **§1** — "O Hermes recadastra imóveis" no sistema: deixa de existir; o imóvel já está no cadastro.
-2. **§3, Imóvel** — campos grupo, unidade, IPTU anual e medidores: substituídos pelo cadastro do Hermes.
+2. **§3, Imóvel** — campos grupo, unidade e medidores: substituídos pelo cadastro do Hermes. **IPTU anual: o Paulo vai verificar** (21/10/2026); até lá, o campo não é removido.
 3. **§11** — o Hermes **não** cadastra imóvel pelo MCP (cadastra pelo `cadastro.py`, do lado dele).
 4. **§9, Documentos** — "o **sistema** é dono da convenção de pastas" deixa de valer. **Decidido pelo
    Paulo (21/10/2026): as únicas pastas são as do Hermes** (seção 3b).
